@@ -10,26 +10,30 @@ allowed-tools: Bash, WebFetch, Read, Write, AskUserQuestion
 
 ## パス定義
 
+スキルファイルの位置からリポジトリルートを算出する。スクリプトは自身の位置から自動解決する。
+
 ```
-REPO_DIR=~/ghq/github.com/ushironoko/pokemon-builder
-SKILL_DIR=$REPO_DIR
-POKEDEX_DIR=$REPO_DIR/pokedex
+SKILL_DIR=（このSKILL.mdが置かれたディレクトリ）
+REPO_ROOT=$SKILL_DIR/../../../..  （.claude/skills/pokemon-builder/ → repo root）
+POKEDEX_DIR=$REPO_ROOT/pokedex
 DB_PATH=$POKEDEX_DIR/pokedex.db
 TYPE_JSON=$POKEDEX_DIR/type/type.json
 ```
 
 ## Phase 0: 初期化
 
-### 0-1: DB存在確認
+### 0-1: リポジトリルートとDB存在確認
 
 ```bash
-test -f ~/ghq/github.com/ushironoko/pokemon-builder/pokedex/pokedex.db && echo "OK" || echo "NOT_FOUND"
+# SKILL.mdのパスからリポジトリルートを算出
+SKILL_PATH="$(dirname "$(readlink -f ~/.claude/skills/pokemon-builder/SKILL.md 2>/dev/null || echo .claude/skills/pokemon-builder/SKILL.md)")"
+REPO_ROOT="$(cd "$SKILL_PATH/../../../.." 2>/dev/null && pwd || pwd)"
+test -f "$REPO_ROOT/pokedex/pokedex.db" && echo "OK" || echo "NOT_FOUND"
 ```
 
 NOT_FOUNDの場合、以下を案内して**スキルを終了**:
 ```
-pokedex DBが見つかりません。以下を実行してください:
-  cd ~/ghq/github.com/ushironoko/pokemon-builder
+pokedex DBが見つかりません。リポジトリルートで以下を実行してください:
   git submodule update --init
   cd pokedex && ruby tools/import_db.rb
 ```
@@ -92,9 +96,11 @@ bash $SKILL_DIR/scripts/query_moves.sh "<globalNo>" "<version>"
 ### 2-2: 特性の説明取得
 
 ```bash
-sqlite3 ~/ghq/github.com/ushironoko/pokemon-builder/pokedex/pokedex.db \
+sqlite3 "$REPO_ROOT/pokedex/pokedex.db" \
   "SELECT name, description FROM ability_language WHERE ability IN ('<ability1>', '<ability2>', '<dream_ability>') AND version='<version>' AND language='jpn';"
 ```
+
+**Note**: `$REPO_ROOT` は Phase 0-1 で算出済みの値を使う。直接実行する場合はスクリプトと同様にリポジトリルートを指定する。
 
 ### 2-3: 分析結果を提示
 

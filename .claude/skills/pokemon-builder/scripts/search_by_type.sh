@@ -5,7 +5,9 @@
 # Output: パイプ区切りテキスト（種族値合計順）
 set -euo pipefail
 
-DB_PATH="${POKEDEX_DB:-$HOME/ghq/github.com/ushironoko/pokemon-builder/pokedex/pokedex.db}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+DB_PATH="${POKEDEX_DB:-$REPO_ROOT/pokedex/pokedex.db}"
 TYPE1="$1"
 TYPE2="${2:-}"
 MIN_SPEED="${3:-0}"

@@ -5,7 +5,9 @@
 # Note: waza系テーブルのversionはMixed Case (e.g., Scarlet_Violet)
 set -euo pipefail
 
-DB_PATH="${POKEDEX_DB:-$HOME/ghq/github.com/ushironoko/pokemon-builder/pokedex/pokedex.db}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+DB_PATH="${POKEDEX_DB:-$REPO_ROOT/pokedex/pokedex.db}"
 GLOBAL_NO="$1"
 VERSION_LOWER="${2:-scarlet_violet}"
 

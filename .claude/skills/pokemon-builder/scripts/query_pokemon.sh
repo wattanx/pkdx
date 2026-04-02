@@ -5,7 +5,9 @@
 # version: scarlet_violet (default), legendsza, sword_shield, etc.
 set -euo pipefail
 
-DB_PATH="${POKEDEX_DB:-$HOME/ghq/github.com/ushironoko/pokemon-builder/pokedex/pokedex.db}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+DB_PATH="${POKEDEX_DB:-$REPO_ROOT/pokedex/pokedex.db}"
 NAME="$1"
 VERSION="${2:-scarlet_violet}"
 
