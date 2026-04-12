@@ -116,7 +116,7 @@ fn ctx_game(ctx : @admiral.Context) -> GameContext {
 fn build_cli() -> @admiral.CliApp {
   @admiral.cli(
     name="pkdx",
-    version="0.2.5",
+    version=pkdx_version,
     description="Pokedex CLI tool",
     commands=[
       cmd_query(),
