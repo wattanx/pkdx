@@ -46,10 +46,11 @@ CLIツール `pkdx` (MoonBit native binary) が pokedex.db への全クエリ、
 
 ```
 pkdx/                     # MoonBit CLI ツール (native binary)
-  moon.mod.json            # モジュール定義 (deps: moonbitlang/x, mizchi/markdown)
+  moon.mod.json            # モジュール定義 (deps: moonbitlang/x, mizchi/markdown) — バージョンの SSoT
   src/
     main/                  # エントリポイント + SQLite C-FFI + File I/O FFI
       main.mbt, cwrap.c, sqlite3.c, io_ffi.mbt
+      version.mbt           # 自動生成 (scripts/sync_version.sh → moon.mod.json から同期)
     db/                    # DB接続 + クエリ関数
     damage/                # Gen9ダメージ計算エンジン (4096丸め, 16段階乱数)
     types/                 # 18x18タイプ相性テーブル (ハードコード)
@@ -63,6 +64,9 @@ pkdx/                     # MoonBit CLI ツール (native binary)
 bin/
   pkdx                    # Unix用ラッパースクリプト (ローカルビルド優先)
   pkdx.cmd                # Windows用ラッパー
+
+scripts/
+  sync_version.sh          # moon.mod.json → version.mbt バージョン同期
 
 box/                      # ユーザーデータ出力先（フォーク先でgit管理）
   teams/                   # team-builder出力 (.md)
@@ -95,6 +99,17 @@ pokedex/                  # git submodule (towakey/pokedex)
 - `local_waza*` / `local_pokedex_waza*` テーブルの `version` は Mixed Case（`Scarlet_Violet`）— pkdx 内部で自動変換
 - タイプ名は日本語（`ほのお`, `みず` 等）
 - `globalNo` はゼロ埋め4桁（`0445`）— pkdx は入力を自動正規化
+
+## Version Management
+
+バージョンは `pkdx/moon.mod.json` の `version` フィールドが SSoT。変更時:
+
+```bash
+# 1. moon.mod.json の version を編集
+# 2. 同期スクリプトを実行
+scripts/sync_version.sh
+# 3. moon.mod.json と version.mbt をコミット
+```
 
 ## CLI Usage (pkdx)
 
