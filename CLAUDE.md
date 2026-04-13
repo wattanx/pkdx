@@ -101,6 +101,40 @@ pokedex/                  # git submodule (towakey/pokedex)
 - `globalNo` はゼロ埋め4桁（`0445`）— pkdx は入力を自動正規化
 - `pkdx_patch/` 配下にパッチマイグレーションがあり、`setup.sh` の Step 2.5 で自動適用される。Champions フォーマット等 pokedex submodule に含まれないデータはここで追加される。パッチは冪等（`pkdx_migrations` テーブルで適用済み管理）
 
+## Champions SP (Stat Points) システム
+
+**重要**: Champions (`--version champions`) では従来のポケモンシリーズの EV (努力値) / IV (個体値) が**完全に廃止**され、SP (Stat Points) に統一されている。従来作品の EV/IV の知識をそのまま適用してはならない。
+
+### 計算式
+
+```
+HP  = BaseStat + SP + 75
+他  = floor((BaseStat + SP + 20) × Nature)
+```
+
+- **Nature**: 1.1 (上昇), 1.0 (無補正), 0.9 (下降) — 整数演算では `× 11/10`, `× 9/10`
+- **各ステータス最大**: 32
+- **合計上限**: 66
+- **IV は存在しない**
+
+### 従来 EV/IV との対応
+
+| 従来 (EV/IV) | Champions (SP) | 実効値 |
+|---|---|---|
+| EV=0, IV=31 | SP=0 | 同値 (HP: base+75, 他: base+20) |
+| EV=252, IV=31 | SP=32 | 同値 (HP: base+107, 他: base+52) |
+| 合計 508 (実効127) | 合計 66 (実効66) | **SP が 1 多い** |
+
+従来の 510 EV 中 508 のみ有効（floor(EV/4) 変換で 2 が端数ロス）だが、SP は直接加算のためロスがない。結果として同じ配分パターンを SP で再現すると **1ポイント余り**、追加の1ステータスに振れる。
+
+### CLI での挙動
+
+`--version champions` 指定時:
+- `--ev` オプションは **SP として解釈**される（各 0-32, 合計 ≤ 66）
+- `--iv` は無視される
+- `hbd` 最適化は予算 66、各上限 32 で動作
+- 出力テーブルは "IV"/"EV" 行の代わりに "SP" 行を表示
+
 ## Version Management
 
 バージョンは `pkdx/moon.mod.json` の `version` フィールドが SSoT。変更時:
