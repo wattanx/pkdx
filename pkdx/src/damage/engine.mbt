@@ -57,9 +57,21 @@ pub fn calc_damage(input : @model.DamageCalcInput) -> @model.DamageCalcResult {
   let def_base_hp = dfn.hp
   let def_base = if is_physical { dfn.def_ } else { dfn.spd }
 
-  let mut atk_stat = calc_stat(atk_base, custom=input.atk_stat_override)
-  let def_hp = calc_stat(def_base_hp, is_hp=true, custom=input.def_hp_override)
-  let mut def_stat = calc_stat(def_base, custom=input.def_stat_override)
+  let mut atk_stat = if input.stat_system == @model.Champions {
+    calc_stat_champions(atk_base, custom=input.atk_stat_override)
+  } else {
+    calc_stat(atk_base, custom=input.atk_stat_override)
+  }
+  let def_hp = if input.stat_system == @model.Champions {
+    calc_stat_champions(def_base_hp, is_hp=true, custom=input.def_hp_override)
+  } else {
+    calc_stat(def_base_hp, is_hp=true, custom=input.def_hp_override)
+  }
+  let mut def_stat = if input.stat_system == @model.Champions {
+    calc_stat_champions(def_base, custom=input.def_stat_override)
+  } else {
+    calc_stat(def_base, custom=input.def_stat_override)
+  }
 
   // 2a-2. Rank (stat stage) modifiers
   if input.atk_stat_override <= 0 {

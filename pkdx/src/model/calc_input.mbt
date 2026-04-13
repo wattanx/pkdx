@@ -18,4 +18,5 @@ pub(all) struct DamageCalcInput {
   def_rank : Int
   fainted_count : Int
   is_double : Bool
+  stat_system : StatSystem
 } derive(Show)

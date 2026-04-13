@@ -100,6 +100,7 @@ fn mk_damage_input(
   tera_type? : String = "",
   fainted_count? : Int = 0,
   is_double? : Bool = false,
+  stat_system? : @model.StatSystem = @model.Standard,
 ) -> @model.DamageCalcInput {
   {
     attacker,
@@ -120,5 +121,6 @@ fn mk_damage_input(
     def_rank,
     fainted_count,
     is_double,
+    stat_system,
   }
 }

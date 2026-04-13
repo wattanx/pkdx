@@ -301,3 +301,238 @@ pub fn reverse_spread(
   })
   results
 }
+
+// ──────────────────────────────────────────────
+// Champions SP-based stat calculations
+// ──────────────────────────────────────────────
+
+///|
+/// Champions HP: base + sp + 75
+pub fn calc_hp_champions(base : Int, sp : Int) -> Int {
+  base + sp + 75
+}
+
+///|
+/// Champions non-HP: floor((base + sp + 20) * nature_num / nature_den)
+pub fn calc_other_champions(
+  base : Int,
+  sp : Int,
+  nature_num : Int,
+  nature_den : Int,
+) -> Int {
+  (base + sp + 20) * nature_num / nature_den
+}
+
+///|
+/// Champions stat shortcut (SP=32 default) for damage engine.
+pub fn calc_stat_champions(
+  base : Int,
+  is_hp? : Bool = false,
+  nature_boost? : Bool = true,
+  custom? : Int = 0,
+) -> Int {
+  if custom > 0 {
+    return custom
+  }
+  if is_hp {
+    return calc_hp_champions(base, 32)
+  }
+  let (num, den) = if nature_boost { (11, 10) } else { (1, 1) }
+  calc_other_champions(base, 32, num, den)
+}
+
+///|
+/// Calculate all 6 stats for Champions.
+/// sps: FixedArray of 6 SP values in HP,Atk,Def,SpA,SpD,Spe order.
+pub fn calc_all_stats_champions(
+  pokemon : @model.Pokemon,
+  sps : FixedArray[Int],
+  nature : @model.Nature,
+) -> FixedArray[Int] {
+  let bases : FixedArray[Int] = [
+    pokemon.hp, pokemon.atk, pokemon.def_, pokemon.spa, pokemon.spd,
+    pokemon.spe,
+  ]
+  let stat_indices : FixedArray[@model.StatIndex] = [
+    HP, Atk, Def, SpA, SpD, Spe,
+  ]
+  let result : FixedArray[Int] = FixedArray::make(6, 0)
+  for i = 0; i < 6; i = i + 1 {
+    if i == 0 {
+      result[i] = calc_hp_champions(bases[i], sps[i])
+    } else {
+      let (num, den) = @model.nature_mult_int(nature, stat_indices[i])
+      result[i] = calc_other_champions(bases[i], sps[i], num, den)
+    }
+  }
+  result
+}
+
+///|
+/// Champions: minimum SP (0..=32) to reach target HP. Returns 33 if unreachable.
+pub fn sp_for_hp_champions(base : Int, target : Int) -> Int {
+  let sp = target - base - 75
+  if sp < 0 {
+    return 0
+  }
+  if sp > 32 {
+    return 33
+  }
+  sp
+}
+
+///|
+/// Champions: minimum SP (0..=32) to reach target non-HP stat. Returns 33 if unreachable.
+pub fn sp_for_non_hp_champions(
+  base : Int,
+  target : Int,
+  nature_num : Int,
+  nature_den : Int,
+) -> Int {
+  // Undo nature: raw_min such that floor(raw_min * num / den) >= target
+  let raw_min = if nature_num == nature_den {
+    target
+  } else {
+    (target * nature_den + nature_num - 1) / nature_num
+  }
+  // raw_min = base + sp + 20 → sp = raw_min - base - 20
+  let sp = raw_min - base - 20
+  if sp < 0 {
+    return 0
+  }
+  if sp > 32 {
+    return 33
+  }
+  // Forward-verify
+  if calc_other_champions(base, sp, nature_num, nature_den) >= target {
+    return sp
+  }
+  let sp2 = sp + 1
+  if sp2 > 32 {
+    return 33
+  }
+  sp2
+}
+
+///|
+/// Champions: reverse derive base stat from actual value + SP.
+pub fn reverse_base_from_stat_champions(
+  actual : Int,
+  sp : Int,
+  is_hp : Bool,
+  nature_num : Int,
+  nature_den : Int,
+) -> Int {
+  if is_hp {
+    // actual = base + sp + 75
+    return actual - sp - 75
+  }
+  // actual = floor((base + sp + 20) * num / den)
+  let raw = if nature_num != nature_den {
+    (actual * nature_den + nature_num - 1) / nature_num
+  } else {
+    actual
+  }
+  let base = raw - sp - 20
+  // Forward-verify with ±1
+  if calc_other_champions(base, sp, nature_num, nature_den) == actual {
+    return base
+  }
+  if calc_other_champions(base + 1, sp, nature_num, nature_den) == actual {
+    return base + 1
+  }
+  if base > 0 &&
+    calc_other_champions(base - 1, sp, nature_num, nature_den) == actual {
+    return base - 1
+  }
+  base
+}
+
+///|
+/// Champions: reverse derive nature + SP spread from actual stats.
+/// Per-stat inversion (not brute-force). Total SP ≤ 66.
+pub fn reverse_spread_champions(
+  pokemon : @model.Pokemon,
+  actual_stats : FixedArray[Int],
+) -> Array[(@model.Nature, FixedArray[Int])] {
+  let bases : FixedArray[Int] = [
+    pokemon.hp, pokemon.atk, pokemon.def_, pokemon.spa, pokemon.spd,
+    pokemon.spe,
+  ]
+  let stat_indices : FixedArray[@model.StatIndex] = [
+    HP, Atk, Def, SpA, SpD, Spe,
+  ]
+  let natures = @model.all_natures()
+  let results : Array[(@model.Nature, FixedArray[Int])] = []
+  for ni = 0; ni < natures.length(); ni = ni + 1 {
+    let nature = natures[ni]
+    let sps : FixedArray[Int] = FixedArray::make(6, -1)
+    let mut valid = true
+    for si = 0; si < 6; si = si + 1 {
+      if not(valid) {
+        break
+      }
+      let actual = actual_stats[si]
+      let base = bases[si]
+      if si == 0 {
+        let sp = actual - base - 75
+        if sp < 0 || sp > 32 {
+          valid = false
+        } else if calc_hp_champions(base, sp) == actual {
+          sps[si] = sp
+        } else {
+          valid = false
+        }
+      } else {
+        let (num, den) = @model.nature_mult_int(nature, stat_indices[si])
+        // Try direct inversion
+        let raw = if num != den {
+          (actual * den + num - 1) / num
+        } else {
+          actual
+        }
+        let sp_candidate = raw - base - 20
+        if sp_candidate >= 0 &&
+          sp_candidate <= 32 &&
+          calc_other_champions(base, sp_candidate, num, den) == actual {
+          sps[si] = sp_candidate
+        } else {
+          // Fallback: scan SP 0..32 (handles rounding edge cases)
+          let mut found = -1
+          for sp = 0; sp <= 32; sp = sp + 1 {
+            if calc_other_champions(base, sp, num, den) == actual {
+              found = sp
+              break
+            }
+          }
+          if found < 0 {
+            valid = false
+          } else {
+            sps[si] = found
+          }
+        }
+      }
+    }
+    if valid {
+      let mut total = 0
+      for si = 0; si < 6; si = si + 1 {
+        total = total + sps[si]
+      }
+      if total <= 66 {
+        results.push((nature, sps))
+      }
+    }
+  }
+  results.sort_by(fn(a, b) {
+    let (_, sps_a) = a
+    let (_, sps_b) = b
+    let mut sum_a = 0
+    let mut sum_b = 0
+    for i = 0; i < 6; i = i + 1 {
+      sum_a = sum_a + sps_a[i]
+      sum_b = sum_b + sps_b[i]
+    }
+    sum_a - sum_b
+  })
+  results
+}

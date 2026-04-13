@@ -689,6 +689,11 @@ fn run_damage(
       def_rank,
       fainted_count,
       is_double,
+      stat_system: if game.version == "champions" {
+        @model.Champions
+      } else {
+        @model.Standard
+      },
     }
     let result = @damage.calc_damage(input)
     println(@cli.format_damage(result, input, format))
@@ -994,18 +999,51 @@ fn run_stat_calc(
   game : GameContext,
   format : @cli.OutputFormat,
 ) -> Unit {
-  let evs = @cli.parse_csv_ints(evs_str, 0, 6)
-  let ivs = @cli.parse_csv_ints(ivs_str, 31, 6)
+  let is_champ = game.version == "champions"
   let nature = resolve_nature(nature_name, nature_up, nature_down)
-  with_db(fn(db) {
-    match @db.query_pokemon(db, name, game.version) {
-      Ok(pokemon) => {
-        let stats = @damage.calc_all_stats(pokemon, ivs, evs, nature)
-        println(@cli.format_stat_calc(pokemon, stats, nature, ivs, evs, format))
+  if is_champ {
+    let sps = @cli.parse_csv_ints(evs_str, 0, 6)
+    // Validate SP constraints
+    let mut total = 0
+    for i = 0; i < 6; i = i + 1 {
+      if sps[i] < 0 || sps[i] > 32 {
+        println("Error: SP values must be 0-32, got " + sps[i].to_string())
+        return
       }
-      Err(e) => println("Error: " + e)
+      total = total + sps[i]
     }
-  })
+    if total > 66 {
+      println("Error: Total SP must be ≤ 66, got " + total.to_string())
+      return
+    }
+    with_db(fn(db) {
+      match @db.query_pokemon(db, name, game.version) {
+        Ok(pokemon) => {
+          let stats = @damage.calc_all_stats_champions(pokemon, sps, nature)
+          println(
+            @cli.format_stat_calc(
+              pokemon, stats, nature, sps, sps, format, is_champions=true,
+            ),
+          )
+        }
+        Err(e) => println("Error: " + e)
+      }
+    })
+  } else {
+    let evs = @cli.parse_csv_ints(evs_str, 0, 6)
+    let ivs = @cli.parse_csv_ints(ivs_str, 31, 6)
+    with_db(fn(db) {
+      match @db.query_pokemon(db, name, game.version) {
+        Ok(pokemon) => {
+          let stats = @damage.calc_all_stats(pokemon, ivs, evs, nature)
+          println(
+            @cli.format_stat_calc(pokemon, stats, nature, ivs, evs, format),
+          )
+        }
+        Err(e) => println("Error: " + e)
+      }
+    })
+  }
 }
 
 ///|
@@ -1019,18 +1057,30 @@ fn run_stat_reverse(
   game : GameContext,
   format : @cli.OutputFormat,
 ) -> Unit {
+  let is_champ = game.version == "champions"
   if stats_str.length() > 0 {
     // Pokemon mode
     let actual_stats = @cli.parse_csv_ints(stats_str, 0, 6)
     with_db(fn(db) {
       match @db.query_pokemon(db, target, game.version) {
         Ok(pokemon) => {
-          let results = @damage.reverse_spread(pokemon, actual_stats, iv)
-          println(
-            @cli.format_stat_reverse_pokemon(
-              pokemon, actual_stats, results, format,
-            ),
-          )
+          if is_champ {
+            let results = @damage.reverse_spread_champions(
+              pokemon, actual_stats,
+            )
+            println(
+              @cli.format_stat_reverse_pokemon(
+                pokemon, actual_stats, results, format, is_champions=true,
+              ),
+            )
+          } else {
+            let results = @damage.reverse_spread(pokemon, actual_stats, iv)
+            println(
+              @cli.format_stat_reverse_pokemon(
+                pokemon, actual_stats, results, format,
+              ),
+            )
+          }
         }
         Err(e) => println("Error: " + e)
       }
@@ -1047,12 +1097,31 @@ fn run_stat_reverse(
       "down" => (9, 10)
       _ => (1, 1)
     }
-    let base = @damage.reverse_base_from_stat(
-      actual, iv, ev, is_hp, nature_num, nature_den,
-    )
-    println(
-      @cli.format_stat_reverse_single(actual, base, iv, ev, is_hp, nature_mod, format),
-    )
+    if is_champ {
+      if ev < 0 || ev > 32 {
+        println(
+          "Error: SP values must be 0-32, got " + ev.to_string(),
+        )
+        return
+      }
+      let base = @damage.reverse_base_from_stat_champions(
+        actual, ev, is_hp, nature_num, nature_den,
+      )
+      println(
+        @cli.format_stat_reverse_single(
+          actual, base, 0, ev, is_hp, nature_mod, format, is_champions=true,
+        ),
+      )
+    } else {
+      let base = @damage.reverse_base_from_stat(
+        actual, iv, ev, is_hp, nature_num, nature_den,
+      )
+      println(
+        @cli.format_stat_reverse_single(
+          actual, base, iv, ev, is_hp, nature_mod, format,
+        ),
+      )
+    }
   }
 }
 
@@ -1097,22 +1166,72 @@ fn run_hbd(
       }
     }
   }
-  let ivs = @cli.parse_csv_ints(ivs_str, 31, 6)
+  let is_champ = game.version == "champions"
   let nature = resolve_nature(nature_name, nature_up, nature_down)
   let weights : @damage.HbdWeights = { phys: phys_weight, spec: spec_weight }
-  with_db(fn(db) {
-    match @db.query_pokemon(db, name, game.version) {
-      Ok(pokemon) => {
-        let result = if top <= 1 {
-          @damage.optimize_hbd(pokemon, fixed_ev, ivs, nature, snap, weights)
-        } else {
-          @damage.optimize_hbd_topn(
-            pokemon, fixed_ev, ivs, nature, snap, weights, top,
+  if is_champ {
+    // Champions: validate per-stat cap and total SP budget
+    let mut fixed_total = 0
+    for i = 0; i < 6; i = i + 1 {
+      if fixed_ev[i] >= 0 {
+        if fixed_ev[i] > 32 {
+          println(
+            "Error: SP values must be 0-32, got " + fixed_ev[i].to_string(),
+          )
+          return
+        }
+        fixed_total = fixed_total + fixed_ev[i]
+      }
+    }
+    if fixed_total > 66 {
+      println(
+        "Error: total fixed SP (" +
+        fixed_total.to_string() +
+        ") exceeds Champions budget of 66",
+      )
+      return
+    }
+    with_db(fn(db) {
+      match @db.query_pokemon(db, name, game.version) {
+        Ok(pokemon) => {
+          let result = if top <= 1 {
+            @damage.optimize_hbd_champions(
+              pokemon, fixed_ev, nature, snap, weights,
+            )
+          } else {
+            @damage.optimize_hbd_topn_champions(
+              pokemon, fixed_ev, nature, snap, weights, top,
+            )
+          }
+          println(
+            @cli.format_hbd(
+              pokemon, nature, snap, weights, result, format, is_champions=true,
+            ),
           )
         }
-        println(@cli.format_hbd(pokemon, nature, snap, weights, result, format))
+        Err(e) => println("Error: " + e)
       }
-      Err(e) => println("Error: " + e)
-    }
-  })
+    })
+  } else {
+    let ivs = @cli.parse_csv_ints(ivs_str, 31, 6)
+    with_db(fn(db) {
+      match @db.query_pokemon(db, name, game.version) {
+        Ok(pokemon) => {
+          let result = if top <= 1 {
+            @damage.optimize_hbd(
+              pokemon, fixed_ev, ivs, nature, snap, weights,
+            )
+          } else {
+            @damage.optimize_hbd_topn(
+              pokemon, fixed_ev, ivs, nature, snap, weights, top,
+            )
+          }
+          println(
+            @cli.format_hbd(pokemon, nature, snap, weights, result, format),
+          )
+        }
+        Err(e) => println("Error: " + e)
+      }
+    })
+  }
 }

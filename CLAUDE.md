@@ -101,6 +101,12 @@ pokedex/                  # git submodule (towakey/pokedex)
 - `globalNo` はゼロ埋め4桁（`0445`）— pkdx は入力を自動正規化
 - `pkdx_patch/` 配下にパッチマイグレーションがあり、`setup.sh` の Step 2.5 で自動適用される。Champions フォーマット等 pokedex submodule に含まれないデータはここで追加される。パッチは冪等（`pkdx_migrations` テーブルで適用済み管理）
 
+## Champions SP (Stat Points) システム
+
+**重要**: Champions (`--version champions`) では従来の EV/IV が**完全に廃止**され、SP に統一されている。従来作品の EV/IV の知識をそのまま適用してはならない。計算式: `HP = base + SP + 75`, `他 = floor((base + SP + 20) × Nature)`。各ステ最大 32、合計 66。従来の 508 EV 配分を SP で再現すると 1 ポイント余り、追加ステに振れる（SP の +1 優位）。CLI では `--ev` が SP として解釈され `--iv` は無視される。
+
+**詳細は `.claude/skills/team-builder/references/champions_sp.md` を参照。** SP 計算式の導出、従来式との同値性証明、+1 優位の具体例、性格補正境界、HBD 最適化の差分、逆算アルゴリズムを記載。
+
 ## Version Management
 
 バージョンは `pkdx/moon.mod.json` の `version` フィールドが SSoT。変更時:
@@ -174,6 +180,7 @@ bin/pkdx hbd "カビゴン" --nature ずぶとい --phys-weight 2 --spec-weight 
 ドメイン理論・設計背景・数式導出など、コードからは読み取れない知識は `.claude/skills/*/references/` に置き、エージェントが質問に自力で回答できるようにする。
 
 - **`.claude/skills/team-builder/references/bulk_theory.md`** — 耐久指数 HBD/(B+D) の導出、H=B+D 則、greedy 勾配法アルゴリズム、11n調整との関係、HP条件の根拠。`hbd` サブコマンドや努力値配分に関する質問はここを第一参照。
+- **`.claude/skills/team-builder/references/champions_sp.md`** — Champions SP システムの全仕様。EV/IV との同値性、+1 優位、性格補正境界、HBD 最適化差分、逆算アルゴリズム。Champions フォーマットのステータス計算に関する質問はここを第一参照。
 - **`.claude/skills/team-builder/references/format_rules.md`** — メガ/ダイマ/Z/テラスタル等のメカニクス定義
 - **`.claude/skills/team-builder/references/stat_thresholds.md`** — 種族値ベンチマーク・素早さティア
 - **`.claude/skills/team-builder/references/items_abilities.md`** — 道具・特性の考察用データ

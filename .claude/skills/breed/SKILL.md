@@ -89,6 +89,24 @@ nature_mod: 上昇=1.1, 無補正=1.0, 下降=0.9
 EV=0時の近似: HP → base+75, 他 → base+20（無補正）
 EV=252時の近似: HP → base+107, 他 → base+52（無補正）
 
+### Champions (SP ベース)
+
+Champions では EV/IV が廃止され SP (Stat Points) に統一。`--version champions` 指定時に使用。
+
+```
+HP = BaseStat + SP + 75
+他 = floor((BaseStat + SP + 20) * nature_mod)
+
+nature_mod: 上昇=1.1(11/10), 無補正=1.0, 下降=0.9(9/10)
+```
+
+- 各ステータス最大: 32
+- 合計上限: 66
+- SP=0時: HP → base+75, 他 → base+20（従来 EV=0 と同値）
+- SP=32時: HP → base+107, 他 → base+52（従来 EV=252 と同値）
+
+Champions 選択時、Phase 6 では「努力値」の代わりに「SP」として 0-32 の範囲で配分を行い、合計 66 以下を制約とする。
+
 ## 性格テーブル
 
 | 性格 | 上昇(×1.1) | 下降(×0.9) |

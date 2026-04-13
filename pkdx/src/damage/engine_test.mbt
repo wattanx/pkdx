@@ -460,3 +460,49 @@ test "calc_damage: そうだいしょう + おはかまいり (fainted_count=3)"
   // そうだいしょう x1.3 がさらに乗るので、技威力だけより大きい
   inspect(r_combo.max_damage > r_move.max_damage, content="true")
 }
+
+// ──────────────────────────────────────────────
+// Champions mode integration tests
+// ──────────────────────────────────────────────
+
+///|
+test "calc_damage: champions mode dispatches correctly" {
+  // At max investment (SP=32 vs IV31/EV252), Champions and Standard formulas
+  // are algebraically equivalent (base+52 for non-HP, base+107 for HP).
+  // Verify Champions mode produces same baseline damage as Standard.
+  let input_champ = mk_damage_input(
+    fixture_garchomp(),
+    fixture_garchomp(),
+    fixture_earthquake(),
+    stat_system=@model.Champions,
+  )
+  let input_standard = mk_damage_input(
+    fixture_garchomp(),
+    fixture_garchomp(),
+    fixture_earthquake(),
+  )
+  let r_champ = calc_damage(input_champ)
+  let r_standard = calc_damage(input_standard)
+  inspect(r_champ.max_damage, content="84")
+  inspect(r_champ.max_damage == r_standard.max_damage, content="true")
+}
+
+///|
+test "calc_damage: champions with rank modifier" {
+  let input = mk_damage_input(
+    fixture_garchomp(),
+    fixture_garchomp(),
+    fixture_earthquake(),
+    stat_system=@model.Champions,
+    atk_rank=2,
+  )
+  let no_rank = mk_damage_input(
+    fixture_garchomp(),
+    fixture_garchomp(),
+    fixture_earthquake(),
+    stat_system=@model.Champions,
+  )
+  let r = calc_damage(input)
+  let r_no = calc_damage(no_rank)
+  inspect(r.max_damage > r_no.max_damage, content="true")
+}

@@ -365,10 +365,11 @@ pub fn format_stat_calc(
   ivs : FixedArray[Int],
   evs : FixedArray[Int],
   fmt : OutputFormat,
+  is_champions? : Bool = false,
 ) -> String {
   match fmt {
-    Json => stat_calc_to_json(pokemon, stats, nature, ivs, evs)
-    Table => stat_calc_to_table(pokemon, stats, nature, ivs, evs)
+    Json => stat_calc_to_json(pokemon, stats, nature, ivs, evs, is_champions)
+    Table => stat_calc_to_table(pokemon, stats, nature, ivs, evs, is_champions)
   }
 }
 
@@ -379,12 +380,20 @@ fn stat_calc_to_json(
   nature : @model.Nature,
   _ivs : FixedArray[Int],
   _evs : FixedArray[Int],
+  is_champions : Bool,
 ) -> String {
+  let sys = if is_champions {
+    ",\"stat_system\":\"champions\""
+  } else {
+    ""
+  }
   "{\"name\":\"" +
   pokemon.name_ja +
   "\",\"nature\":\"" +
   nature.name_ja +
-  "\",\"hp\":" +
+  "\"" +
+  sys +
+  ",\"hp\":" +
   stats[0].to_string() +
   ",\"atk\":" +
   stats[1].to_string() +
@@ -432,6 +441,7 @@ fn stat_calc_to_table(
   nature : @model.Nature,
   ivs : FixedArray[Int],
   evs : FixedArray[Int],
+  is_champions : Bool,
 ) -> String {
   let mut s = pokemon.name_ja +
     " (" +
@@ -457,18 +467,27 @@ fn stat_calc_to_table(
     s = s + pad_right(bases[i].to_string(), 6)
   }
   s = s + "\n"
-  // IV
-  s = s + pad_right("IV", 6)
-  for i = 0; i < 6; i = i + 1 {
-    s = s + pad_right(ivs[i].to_string(), 6)
+  if is_champions {
+    // SP row (Champions has no IV)
+    s = s + pad_right("SP", 6)
+    for i = 0; i < 6; i = i + 1 {
+      s = s + pad_right(evs[i].to_string(), 6)
+    }
+    s = s + "\n"
+  } else {
+    // IV
+    s = s + pad_right("IV", 6)
+    for i = 0; i < 6; i = i + 1 {
+      s = s + pad_right(ivs[i].to_string(), 6)
+    }
+    s = s + "\n"
+    // EV
+    s = s + pad_right("EV", 6)
+    for i = 0; i < 6; i = i + 1 {
+      s = s + pad_right(evs[i].to_string(), 6)
+    }
+    s = s + "\n"
   }
-  s = s + "\n"
-  // EV
-  s = s + pad_right("EV", 6)
-  for i = 0; i < 6; i = i + 1 {
-    s = s + pad_right(evs[i].to_string(), 6)
-  }
-  s = s + "\n"
   s = s + "─".to_string().repeat(50) + "\n"
   // Stat
   s = s + pad_right("Stat", 6)
@@ -489,38 +508,68 @@ pub fn format_stat_reverse_single(
   is_hp : Bool,
   nature_mod : String,
   fmt : OutputFormat,
+  is_champions? : Bool = false,
 ) -> String {
   match fmt {
     Json =>
-      "{\"actual\":" +
-      actual.to_string() +
-      ",\"base\":" +
-      base.to_string() +
-      ",\"iv\":" +
-      iv.to_string() +
-      ",\"ev\":" +
-      ev.to_string() +
-      ",\"is_hp\":" +
-      is_hp.to_string() +
-      ",\"nature\":\"" +
-      nature_mod +
-      "\"}"
+      if is_champions {
+        "{\"actual\":" +
+        actual.to_string() +
+        ",\"base\":" +
+        base.to_string() +
+        ",\"sp\":" +
+        ev.to_string() +
+        ",\"is_hp\":" +
+        is_hp.to_string() +
+        ",\"nature\":\"" +
+        nature_mod +
+        "\",\"stat_system\":\"champions\"}"
+      } else {
+        "{\"actual\":" +
+        actual.to_string() +
+        ",\"base\":" +
+        base.to_string() +
+        ",\"iv\":" +
+        iv.to_string() +
+        ",\"ev\":" +
+        ev.to_string() +
+        ",\"is_hp\":" +
+        is_hp.to_string() +
+        ",\"nature\":\"" +
+        nature_mod +
+        "\"}"
+      }
     Table => {
       let stat_type = if is_hp { "HP" } else { "Other" }
-      "Actual: " +
-      actual.to_string() +
-      " (" +
-      stat_type +
-      ", IV:" +
-      iv.to_string() +
-      " EV:" +
-      ev.to_string() +
-      " Nature:" +
-      nature_mod +
-      ")\n" +
-      "Base stat: " +
-      base.to_string() +
-      "\n"
+      if is_champions {
+        "Actual: " +
+        actual.to_string() +
+        " (" +
+        stat_type +
+        ", SP:" +
+        ev.to_string() +
+        " Nature:" +
+        nature_mod +
+        ")\n" +
+        "Base stat: " +
+        base.to_string() +
+        "\n"
+      } else {
+        "Actual: " +
+        actual.to_string() +
+        " (" +
+        stat_type +
+        ", IV:" +
+        iv.to_string() +
+        " EV:" +
+        ev.to_string() +
+        " Nature:" +
+        nature_mod +
+        ")\n" +
+        "Base stat: " +
+        base.to_string() +
+        "\n"
+      }
     }
   }
 }
@@ -532,13 +581,19 @@ pub fn format_stat_reverse_pokemon(
   actual_stats : FixedArray[Int],
   results : Array[(@model.Nature, FixedArray[Int])],
   fmt : OutputFormat,
+  is_champions? : Bool = false,
 ) -> String {
   if results.length() == 0 {
-    return "No valid nature/EV combination found."
+    let label = if is_champions { "nature/SP" } else { "nature/EV" }
+    return "No valid " + label + " combination found."
   }
   match fmt {
-    Json => stat_reverse_pokemon_to_json(pokemon, results)
-    Table => stat_reverse_pokemon_to_table(pokemon, actual_stats, results)
+    Json =>
+      stat_reverse_pokemon_to_json(pokemon, results, is_champions)
+    Table =>
+      stat_reverse_pokemon_to_table(
+        pokemon, actual_stats, results, is_champions,
+      )
   }
 }
 
@@ -546,32 +601,36 @@ pub fn format_stat_reverse_pokemon(
 fn stat_reverse_pokemon_to_json(
   _pokemon : @model.Pokemon,
   results : Array[(@model.Nature, FixedArray[Int])],
+  is_champions : Bool,
 ) -> String {
+  let key = if is_champions { "sps" } else { "evs" }
   let mut s = "["
   for i = 0; i < results.length(); i = i + 1 {
     if i > 0 {
       s = s + ","
     }
-    let (nature, evs) = results[i]
+    let (nature, vals) = results[i]
     let mut total = 0
     for j = 0; j < 6; j = j + 1 {
-      total = total + evs[j]
+      total = total + vals[j]
     }
     s = s +
       "{\"nature\":\"" +
       nature.name_ja +
-      "\",\"evs\":[" +
-      evs[0].to_string() +
+      "\",\"" +
+      key +
+      "\":[" +
+      vals[0].to_string() +
       "," +
-      evs[1].to_string() +
+      vals[1].to_string() +
       "," +
-      evs[2].to_string() +
+      vals[2].to_string() +
       "," +
-      evs[3].to_string() +
+      vals[3].to_string() +
       "," +
-      evs[4].to_string() +
+      vals[4].to_string() +
       "," +
-      evs[5].to_string() +
+      vals[5].to_string() +
       "],\"total\":" +
       total.to_string() +
       "}"
@@ -584,7 +643,9 @@ fn stat_reverse_pokemon_to_table(
   pokemon : @model.Pokemon,
   actual_stats : FixedArray[Int],
   results : Array[(@model.Nature, FixedArray[Int])],
+  is_champions : Bool,
 ) -> String {
+  let label = if is_champions { "SP" } else { "EV" }
   let mut s = pokemon.name_ja +
     "  実数値: " +
     actual_stats[0].to_string() +
@@ -601,10 +662,10 @@ fn stat_reverse_pokemon_to_table(
     "\n"
   s = s + "─".to_string().repeat(50) + "\n"
   for i = 0; i < results.length(); i = i + 1 {
-    let (nature, evs) = results[i]
+    let (nature, vals) = results[i]
     let mut total = 0
     for j = 0; j < 6; j = j + 1 {
-      total = total + evs[j]
+      total = total + vals[j]
     }
     s = s +
       "候補" +
@@ -613,18 +674,20 @@ fn stat_reverse_pokemon_to_table(
       nature_label(nature) +
       "\n"
     s = s +
-      "  EV: " +
-      evs[0].to_string() +
+      "  " +
+      label +
+      ": " +
+      vals[0].to_string() +
       "/" +
-      evs[1].to_string() +
+      vals[1].to_string() +
       "/" +
-      evs[2].to_string() +
+      vals[2].to_string() +
       "/" +
-      evs[3].to_string() +
+      vals[3].to_string() +
       "/" +
-      evs[4].to_string() +
+      vals[4].to_string() +
       "/" +
-      evs[5].to_string() +
+      vals[5].to_string() +
       " (合計: " +
       total.to_string() +
       ")\n"
@@ -659,10 +722,11 @@ pub fn format_hbd(
   weights : @damage.HbdWeights,
   result : @damage.HbdResult,
   fmt : OutputFormat,
+  is_champions? : Bool = false,
 ) -> String {
   match fmt {
-    Json => hbd_to_json(pokemon, nature, snap, weights, result)
-    Table => hbd_to_table(pokemon, nature, snap, weights, result)
+    Json => hbd_to_json(pokemon, nature, snap, weights, result, is_champions)
+    Table => hbd_to_table(pokemon, nature, snap, weights, result, is_champions)
   }
 }
 
@@ -673,6 +737,7 @@ fn hbd_to_json(
   snap : @model.HpSnap,
   weights : @damage.HbdWeights,
   result : @damage.HbdResult,
+  is_champions : Bool,
 ) -> String {
   let mut cand_arr = "["
   for i = 0; i < result.candidates.length(); i = i + 1 {
@@ -688,10 +753,13 @@ fn hbd_to_json(
       evs_arr = evs_arr + c.evs[j].to_string()
     }
     evs_arr = evs_arr + "]"
+    let evs_key = if is_champions { "sps" } else { "evs" }
     cand_arr = cand_arr +
       "{\"rank\":" +
       (i + 1).to_string() +
-      ",\"evs\":" +
+      ",\"" +
+      evs_key +
+      "\":" +
       evs_arr +
       ",\"stats\":{\"hp\":" +
       c.hp.to_string() +
@@ -708,6 +776,11 @@ fn hbd_to_json(
     Some(msg) => "\"" + msg + "\""
     None => "null"
   }
+  let sys = if is_champions {
+    ",\"stat_system\":\"champions\""
+  } else {
+    ""
+  }
   "{\"pokemon\":\"" +
   pokemon.name_ja +
   "\",\"nature\":\"" +
@@ -718,7 +791,9 @@ fn hbd_to_json(
   weights.spec.to_string() +
   "},\"hp_snap\":\"" +
   hp_snap_label(snap) +
-  "\",\"warning\":" +
+  "\"" +
+  sys +
+  ",\"warning\":" +
   warning_json +
   ",\"candidates\":" +
   cand_arr +
@@ -732,6 +807,7 @@ fn hbd_to_table(
   snap : @model.HpSnap,
   weights : @damage.HbdWeights,
   result : @damage.HbdResult,
+  is_champions : Bool,
 ) -> String {
   let mut s = "=== HBD Optimization: " +
     pokemon.name_ja +
@@ -756,40 +832,67 @@ fn hbd_to_table(
   if result.candidates.length() == 1 {
     // Single-solution detailed view
     let c = result.candidates[0]
-    s = s +
-      pad_right("Stat", 7) +
-      pad_right("Base", 6) +
-      pad_right("IV", 5) +
-      pad_right("EV", 6) +
-      "Value\n"
-    s = s +
-      pad_right("HP", 7) +
-      pad_right(pokemon.hp.to_string(), 6) +
-      pad_right("31", 5) +
-      pad_right(c.evs[0].to_string(), 6) +
-      c.hp.to_string() +
-      "\n"
-    s = s +
-      pad_right("Def", 7) +
-      pad_right(pokemon.def_.to_string(), 6) +
-      pad_right("31", 5) +
-      pad_right(c.evs[2].to_string(), 6) +
-      c.def_.to_string() +
-      "\n"
-    s = s +
-      pad_right("SpD", 7) +
-      pad_right(pokemon.spd.to_string(), 6) +
-      pad_right("31", 5) +
-      pad_right(c.evs[4].to_string(), 6) +
-      c.spd.to_string() +
-      "\n"
+    if is_champions {
+      s = s +
+        pad_right("Stat", 7) +
+        pad_right("Base", 6) +
+        pad_right("SP", 6) +
+        "Value\n"
+      s = s +
+        pad_right("HP", 7) +
+        pad_right(pokemon.hp.to_string(), 6) +
+        pad_right(c.evs[0].to_string(), 6) +
+        c.hp.to_string() +
+        "\n"
+      s = s +
+        pad_right("Def", 7) +
+        pad_right(pokemon.def_.to_string(), 6) +
+        pad_right(c.evs[2].to_string(), 6) +
+        c.def_.to_string() +
+        "\n"
+      s = s +
+        pad_right("SpD", 7) +
+        pad_right(pokemon.spd.to_string(), 6) +
+        pad_right(c.evs[4].to_string(), 6) +
+        c.spd.to_string() +
+        "\n"
+    } else {
+      s = s +
+        pad_right("Stat", 7) +
+        pad_right("Base", 6) +
+        pad_right("IV", 5) +
+        pad_right("EV", 6) +
+        "Value\n"
+      s = s +
+        pad_right("HP", 7) +
+        pad_right(pokemon.hp.to_string(), 6) +
+        pad_right("31", 5) +
+        pad_right(c.evs[0].to_string(), 6) +
+        c.hp.to_string() +
+        "\n"
+      s = s +
+        pad_right("Def", 7) +
+        pad_right(pokemon.def_.to_string(), 6) +
+        pad_right("31", 5) +
+        pad_right(c.evs[2].to_string(), 6) +
+        c.def_.to_string() +
+        "\n"
+      s = s +
+        pad_right("SpD", 7) +
+        pad_right(pokemon.spd.to_string(), 6) +
+        pad_right("31", 5) +
+        pad_right(c.evs[4].to_string(), 6) +
+        c.spd.to_string() +
+        "\n"
+    }
     s = s + "\nScore: " + format_score(c.score) + "\n"
     return s
   }
   // Multi-solution ranked table
+  let alloc_label = if is_champions { "SP(H/B/D)" } else { "EV(H/B/D)" }
   s = s +
     pad_right("Rank", 6) +
-    pad_right("EV(H/B/D)", 16) +
+    pad_right(alloc_label, 16) +
     pad_right("HP", 5) +
     pad_right("Def", 5) +
     pad_right("SpD", 5) +

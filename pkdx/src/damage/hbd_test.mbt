@@ -249,3 +249,116 @@ test "optimize_hbd: asymmetric weights — phys≫spec favors B" {
   // Heavy special damage → invest more in SpD (slot 4)
   assert_true(c_spec.evs[4] >= c_spec.evs[2])
 }
+
+// ──────────────────────────────────────────────
+// Champions HBD optimization tests
+// ──────────────────────────────────────────────
+
+///|
+fn all_optimize_sps() -> FixedArray[Int] {
+  [-1, 0, -1, 0, -1, 0]
+}
+
+///|
+test "optimize_hbd_champions: budget and cap constraints" {
+  let garch = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let result = optimize_hbd_champions(
+    garch,
+    all_optimize_sps(),
+    neutral_nature(),
+    @model.HpSnap::NoSnap,
+    default_weights(),
+  )
+  assert_true(result.candidates.length() == 1)
+  let c = result.candidates[0]
+  let total = c.evs[0] + c.evs[1] + c.evs[2] + c.evs[3] + c.evs[4] + c.evs[5]
+  assert_true(total <= 66)
+  assert_true(c.evs[0] <= 32)
+  assert_true(c.evs[2] <= 32)
+  assert_true(c.evs[4] <= 32)
+  assert_true(c.evs[1] == 0)
+  assert_true(c.evs[3] == 0)
+  assert_true(c.evs[5] == 0)
+  assert_true(c.score > 0.0)
+}
+
+///|
+test "optimize_hbd_champions: greedy within 1% of brute-force" {
+  let garch = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let greedy = optimize_hbd_champions(
+    garch,
+    all_optimize_sps(),
+    neutral_nature(),
+    @model.HpSnap::NoSnap,
+    default_weights(),
+  )
+  let brute = optimize_hbd_topn_champions(
+    garch,
+    all_optimize_sps(),
+    neutral_nature(),
+    @model.HpSnap::NoSnap,
+    default_weights(),
+    1,
+  )
+  let g = greedy.candidates[0].score
+  let b = brute.candidates[0].score
+  assert_true(g >= b * 0.99)
+  assert_true(b >= g)
+}
+
+///|
+test "optimize_hbd_champions: fixed S=32 reserves budget" {
+  let garch = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let fixed : FixedArray[Int] = [-1, 0, -1, 0, -1, 32]
+  let result = optimize_hbd_champions(
+    garch,
+    fixed,
+    neutral_nature(),
+    @model.HpSnap::NoSnap,
+    default_weights(),
+  )
+  let c = result.candidates[0]
+  inspect(c.evs[5], content="32")
+  let hbd_total = c.evs[0] + c.evs[2] + c.evs[4]
+  assert_true(hbd_total <= 34) // 66 - 32
+}
+
+///|
+test "optimize_hbd_topn_champions: constraint adherence" {
+  let garch = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let result = optimize_hbd_topn_champions(
+    garch,
+    all_optimize_sps(),
+    neutral_nature(),
+    @model.HpSnap::NoSnap,
+    default_weights(),
+    5,
+  )
+  assert_true(result.candidates.length() == 5)
+  for i = 0; i < result.candidates.length(); i = i + 1 {
+    let c = result.candidates[i]
+    let total = c.evs[0] + c.evs[1] + c.evs[2] + c.evs[3] + c.evs[4] + c.evs[5]
+    assert_true(total <= 66)
+    assert_true(c.evs[0] <= 32)
+    assert_true(c.evs[2] <= 32)
+    assert_true(c.evs[4] <= 32)
+  }
+  // Descending scores
+  for i = 1; i < result.candidates.length(); i = i + 1 {
+    assert_true(result.candidates[i - 1].score >= result.candidates[i].score)
+  }
+}
+
+///|
+test "optimize_hbd_champions: HpSnap::Leftovers" {
+  let garch = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let result = optimize_hbd_champions(
+    garch,
+    all_optimize_sps(),
+    neutral_nature(),
+    @model.HpSnap::Leftovers,
+    default_weights(),
+  )
+  let c = result.candidates[0]
+  inspect(c.hp % 16, content="1")
+}

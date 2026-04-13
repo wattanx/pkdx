@@ -316,3 +316,213 @@ test "apply_rank: clamp upper" {
 test "apply_rank: clamp lower" {
   inspect(apply_rank(100, -10), content="25")
 }
+
+// ──────────────────────────────────────────────
+// Champions SP calculation tests
+// ──────────────────────────────────────────────
+
+///|
+test "calc_hp_champions: ガブリアス HP108, SP=0" {
+  inspect(calc_hp_champions(108, 0), content="183")
+}
+
+///|
+test "calc_hp_champions: ガブリアス HP108, SP=32" {
+  // 108 + 32 + 75 = 215
+  // (same result as traditional IV31/EV252, different formula)
+  inspect(calc_hp_champions(108, 32), content="215")
+}
+
+///|
+test "calc_hp_champions: base=1, SP=0" {
+  inspect(calc_hp_champions(1, 0), content="76")
+}
+
+///|
+test "calc_other_champions: ガブリアス Atk130, SP=32, nature up" {
+  // (130 + 32 + 20) * 11 / 10 = 182 * 11 / 10 = 200
+  inspect(calc_other_champions(130, 32, 11, 10), content="200")
+}
+
+///|
+test "calc_other_champions: ガブリアス SpA80, SP=0, nature down" {
+  // (80 + 0 + 20) * 9 / 10 = 100 * 9 / 10 = 90
+  inspect(calc_other_champions(80, 0, 9, 10), content="90")
+}
+
+///|
+test "calc_other_champions: ガブリアス Def95, SP=0, neutral" {
+  // (95 + 0 + 20) * 1 / 1 = 115
+  inspect(calc_other_champions(95, 0, 1, 1), content="115")
+}
+
+///|
+test "calc_other_champions: nature up +2 at 11n boundary" {
+  // (102 + 32 + 20) = 154, 154 * 11 / 10 = 1694 / 10 = 169
+  inspect(calc_other_champions(102, 32, 11, 10), content="169")
+  // SP=31: (102 + 31 + 20) = 153, 153 * 11 / 10 = 1683 / 10 = 168
+  inspect(calc_other_champions(102, 31, 11, 10), content="168")
+}
+
+///|
+test "calc_stat_champions: HP shortcut (SP=32)" {
+  inspect(calc_stat_champions(108, is_hp=true), content="215")
+}
+
+///|
+test "calc_stat_champions: Atk shortcut with nature boost" {
+  inspect(calc_stat_champions(130), content="200")
+}
+
+///|
+test "calc_stat_champions: custom override" {
+  inspect(calc_stat_champions(130, custom=999), content="999")
+}
+
+///|
+test "calc_all_stats_champions: ガブリアス ようき SP=[0,32,0,0,0,32]" {
+  let pokemon = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let sps : FixedArray[Int] = [0, 32, 0, 0, 0, 32]
+  match @model.nature_from_ja("ようき") {
+    Some(nature) => {
+      let stats = calc_all_stats_champions(pokemon, sps, nature)
+      inspect(stats[0], content="183") // HP: 108+0+75
+      inspect(stats[1], content="182") // Atk: (130+32+20)*1/1 (ようき neutral for Atk)
+      inspect(stats[2], content="115") // Def: (95+0+20)*1/1
+      inspect(stats[3], content="90") // SpA: (80+0+20)*9/10 (↓)
+      inspect(stats[4], content="105") // SpD: (85+0+20)*1/1
+      inspect(stats[5], content="169") // Spe: (102+32+20)*11/10 (↑)
+    }
+    None => fail("nature not found")
+  }
+}
+
+///|
+test "sp_for_hp_champions: target=183 (SP=0)" {
+  inspect(sp_for_hp_champions(108, 183), content="0")
+}
+
+///|
+test "sp_for_hp_champions: target=215 (SP=32)" {
+  inspect(sp_for_hp_champions(108, 215), content="32")
+}
+
+///|
+test "sp_for_hp_champions: unreachable → 33 sentinel" {
+  inspect(sp_for_hp_champions(108, 999), content="33")
+}
+
+///|
+test "sp_for_hp_champions: target below minimum → 0" {
+  // target = 100 < 108+0+75=183, sp would be negative → clamp to 0
+  inspect(sp_for_hp_champions(108, 100), content="0")
+}
+
+///|
+test "sp_for_non_hp_champions: neutral, target=115 (SP=0)" {
+  inspect(sp_for_non_hp_champions(95, 115, 1, 1), content="0")
+}
+
+///|
+test "sp_for_non_hp_champions: neutral, target=147 (SP=32)" {
+  // (95+32+20)*1/1 = 147
+  inspect(sp_for_non_hp_champions(95, 147, 1, 1), content="32")
+}
+
+///|
+test "sp_for_non_hp_champions: nature up, target=200" {
+  // (130+sp+20)*11/10 >= 200 → sp+150 >= ceil(200*10/11)=182 → sp >= 32
+  inspect(sp_for_non_hp_champions(130, 200, 11, 10), content="32")
+}
+
+///|
+test "sp_for_non_hp_champions: nature down, target=90" {
+  // (80+sp+20)*9/10 >= 90 → sp+100 >= ceil(90*10/9)=100 → sp >= 0
+  inspect(sp_for_non_hp_champions(80, 90, 9, 10), content="0")
+}
+
+///|
+test "sp_for_non_hp_champions: unreachable → 33 sentinel" {
+  inspect(sp_for_non_hp_champions(95, 9999, 11, 10), content="33")
+}
+
+///|
+test "sp_for_non_hp_champions: round-trip all SP values" {
+  let base = 100
+  for sp = 0; sp <= 32; sp = sp + 1 {
+    let stat = calc_other_champions(base, sp, 11, 10)
+    let back = sp_for_non_hp_champions(base, stat, 11, 10)
+    assert_true(back <= sp)
+    assert_true(calc_other_champions(base, back, 11, 10) == stat)
+  }
+}
+
+///|
+test "reverse_base_from_stat_champions: HP 183 → base 108" {
+  inspect(reverse_base_from_stat_champions(183, 0, true, 1, 1), content="108")
+}
+
+///|
+test "reverse_base_from_stat_champions: Atk 200, SP=32, nature up → base 130" {
+  inspect(
+    reverse_base_from_stat_champions(200, 32, false, 11, 10), content="130",
+  )
+}
+
+///|
+test "reverse_base_from_stat_champions: round-trip" {
+  let bases = [1, 50, 80, 108, 130, 200, 255]
+  for i = 0; i < bases.length(); i = i + 1 {
+    let base = bases[i]
+    let actual_hp = calc_hp_champions(base, 16)
+    let recovered_hp = reverse_base_from_stat_champions(
+      actual_hp, 16, true, 1, 1,
+    )
+    inspect(recovered_hp == base, content="true")
+    let actual_other = calc_other_champions(base, 16, 11, 10)
+    let recovered_other = reverse_base_from_stat_champions(
+      actual_other, 16, false, 11, 10,
+    )
+    inspect(recovered_other == base, content="true")
+  }
+}
+
+///|
+test "reverse_spread_champions: ガブリアス 183/182/115/90/105/169" {
+  let pokemon = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let actual_stats : FixedArray[Int] = [183, 182, 115, 90, 105, 169]
+  let results = reverse_spread_champions(pokemon, actual_stats)
+  assert_true(results.length() > 0)
+  let found = {
+    let mut f = false
+    for i = 0; i < results.length(); i = i + 1 {
+      let (nature, sps) = results[i]
+      if nature.name_ja == "ようき" &&
+        sps[0] == 0 &&
+        sps[1] == 32 &&
+        sps[2] == 0 &&
+        sps[3] == 0 &&
+        sps[4] == 0 &&
+        sps[5] == 32 {
+        f = true
+      }
+    }
+    f
+  }
+  assert_true(found)
+}
+
+///|
+test "reverse_spread_champions: total SP <= 66 enforced" {
+  let pokemon = mk_pokemon("ガブリアス", 108, 130, 95, 80, 85, 102)
+  let actual_stats : FixedArray[Int] = [183, 182, 115, 90, 105, 169]
+  let results = reverse_spread_champions(pokemon, actual_stats)
+  for i = 0; i < results.length(); i = i + 1 {
+    let (_, sps) = results[i]
+    let mut total = 0
+    for j = 0; j < 6; j = j + 1 {
+      total = total + sps[j]
+    }
+    assert_true(total <= 66)
+  }
+}
