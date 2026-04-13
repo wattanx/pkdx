@@ -90,6 +90,44 @@ cd $REPO_ROOT && git stash push -u -m "self-update: auto-stash $(date +%Y%m%d-%H
 cd $REPO_ROOT && git fetch $UPDATE_REMOTE
 ```
 
+`git fetch` が**失敗**した場合、以下のフォールバック判定を行う:
+
+### 1-F: Web環境フォールバック（フォーク運用 + fetch失敗時）
+
+**条件**: `$UPDATE_REMOTE` が `upstream` （フォーク運用）かつ `git fetch upstream` が失敗（exit code ≠ 0）
+
+この状況は Claude Code on the web 環境で発生する。web環境では git proxy がセッション対象リポジトリ（origin）のみにアクセスを制限するため、upstream への fetch がブロックされる。
+
+**手順**:
+
+1. ユーザーに状況を説明し、GitHub Web UIでの操作を案内する:
+
+```
+⚠ この環境では upstream リポジトリへの直接アクセスが制限されています。
+  GitHub の Web UI から最新版を取り込む必要があります。
+```
+
+**AskUserQuestion**（1問）:
+
+| # | 質問 | header | オプション |
+|---|------|--------|-----------|
+| 1 | GitHub Web UIでフォークを同期してください。\n\n手順:\n1. ブラウザで自分のフォークリポジトリページを開く\n2. 「Sync fork」ボタンをクリック\n3. 「Update branch」をクリック\n4. 完了したら「完了」を選択してください | フォーク同期 | 完了(desc: Sync forkを実行しました), 中断(desc: 更新を中断します) |
+
+「中断」→ Phase 3（Stash復元）へスキップしてスキル終了。
+
+「完了」→ origin から pull して最新を取り込む:
+
+```bash
+cd $REPO_ROOT && git pull origin $UPSTREAM_BRANCH
+```
+
+pull 成功後、Phase 1-1（差分確認）をスキップし **Phase 2（バイナリ更新）** へ進む。
+pull 失敗時は通常のコンフリクト処理（Phase 1-3）と同様に処理する。
+
+---
+
+`git fetch` が**成功**した場合、以下の通常フローを続行する:
+
 ### 1-1: 差分確認
 
 ```bash
@@ -189,6 +227,7 @@ stash popでコンフリクトが発生した場合:
 ```
 === pkdxバージョンアップ完了 ===
 マージ元: $UPDATE_REMOTE/$UPSTREAM_BRANCH
+取り込み方法: <fetch & merge / Sync fork経由>
 新規コミット数: <N>
 コンフリクト解決: <あり/なし>
 pkdx tools: <更新済み/スキップ>
