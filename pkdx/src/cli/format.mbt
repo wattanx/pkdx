@@ -753,10 +753,13 @@ fn hbd_to_json(
       evs_arr = evs_arr + c.evs[j].to_string()
     }
     evs_arr = evs_arr + "]"
+    let evs_key = if is_champions { "sps" } else { "evs" }
     cand_arr = cand_arr +
       "{\"rank\":" +
       (i + 1).to_string() +
-      ",\"evs\":" +
+      ",\"" +
+      evs_key +
+      "\":" +
       evs_arr +
       ",\"stats\":{\"hp\":" +
       c.hp.to_string() +

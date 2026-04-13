@@ -103,37 +103,9 @@ pokedex/                  # git submodule (towakey/pokedex)
 
 ## Champions SP (Stat Points) システム
 
-**重要**: Champions (`--version champions`) では従来のポケモンシリーズの EV (努力値) / IV (個体値) が**完全に廃止**され、SP (Stat Points) に統一されている。従来作品の EV/IV の知識をそのまま適用してはならない。
+**重要**: Champions (`--version champions`) では従来の EV/IV が**完全に廃止**され、SP に統一されている。従来作品の EV/IV の知識をそのまま適用してはならない。計算式: `HP = base + SP + 75`, `他 = floor((base + SP + 20) × Nature)`。各ステ最大 32、合計 66。従来の 508 EV 配分を SP で再現すると 1 ポイント余り、追加ステに振れる（SP の +1 優位）。CLI では `--ev` が SP として解釈され `--iv` は無視される。
 
-### 計算式
-
-```
-HP  = BaseStat + SP + 75
-他  = floor((BaseStat + SP + 20) × Nature)
-```
-
-- **Nature**: 1.1 (上昇), 1.0 (無補正), 0.9 (下降) — 整数演算では `× 11/10`, `× 9/10`
-- **各ステータス最大**: 32
-- **合計上限**: 66
-- **IV は存在しない**
-
-### 従来 EV/IV との対応
-
-| 従来 (EV/IV) | Champions (SP) | 実効値 |
-|---|---|---|
-| EV=0, IV=31 | SP=0 | 同値 (HP: base+75, 他: base+20) |
-| EV=252, IV=31 | SP=32 | 同値 (HP: base+107, 他: base+52) |
-| 合計 508 (実効127) | 合計 66 (実効66) | **SP が 1 多い** |
-
-従来の 510 EV 中 508 のみ有効（floor(EV/4) 変換で 2 が端数ロス）だが、SP は直接加算のためロスがない。結果として同じ配分パターンを SP で再現すると **1ポイント余り**、追加の1ステータスに振れる。
-
-### CLI での挙動
-
-`--version champions` 指定時:
-- `--ev` オプションは **SP として解釈**される（各 0-32, 合計 ≤ 66）
-- `--iv` は無視される
-- `hbd` 最適化は予算 66、各上限 32 で動作
-- 出力テーブルは "IV"/"EV" 行の代わりに "SP" 行を表示
+**詳細は `.claude/skills/team-builder/references/champions_sp.md` を参照。** SP 計算式の導出、従来式との同値性証明、+1 優位の具体例、性格補正境界、HBD 最適化の差分、逆算アルゴリズムを記載。
 
 ## Version Management
 
@@ -208,6 +180,7 @@ bin/pkdx hbd "カビゴン" --nature ずぶとい --phys-weight 2 --spec-weight 
 ドメイン理論・設計背景・数式導出など、コードからは読み取れない知識は `.claude/skills/*/references/` に置き、エージェントが質問に自力で回答できるようにする。
 
 - **`.claude/skills/team-builder/references/bulk_theory.md`** — 耐久指数 HBD/(B+D) の導出、H=B+D 則、greedy 勾配法アルゴリズム、11n調整との関係、HP条件の根拠。`hbd` サブコマンドや努力値配分に関する質問はここを第一参照。
+- **`.claude/skills/team-builder/references/champions_sp.md`** — Champions SP システムの全仕様。EV/IV との同値性、+1 優位、性格補正境界、HBD 最適化差分、逆算アルゴリズム。Champions フォーマットのステータス計算に関する質問はここを第一参照。
 - **`.claude/skills/team-builder/references/format_rules.md`** — メガ/ダイマ/Z/テラスタル等のメカニクス定義
 - **`.claude/skills/team-builder/references/stat_thresholds.md`** — 種族値ベンチマーク・素早さティア
 - **`.claude/skills/team-builder/references/items_abilities.md`** — 道具・特性の考察用データ

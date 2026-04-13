@@ -1098,6 +1098,12 @@ fn run_stat_reverse(
       _ => (1, 1)
     }
     if is_champ {
+      if ev < 0 || ev > 32 {
+        println(
+          "Error: SP values must be 0-32, got " + ev.to_string(),
+        )
+        return
+      }
       let base = @damage.reverse_base_from_stat_champions(
         actual, ev, is_hp, nature_num, nature_den,
       )
@@ -1164,14 +1170,26 @@ fn run_hbd(
   let nature = resolve_nature(nature_name, nature_up, nature_down)
   let weights : @damage.HbdWeights = { phys: phys_weight, spec: spec_weight }
   if is_champ {
-    // Champions: validate SP constraints on fixed values
+    // Champions: validate per-stat cap and total SP budget
+    let mut fixed_total = 0
     for i = 0; i < 6; i = i + 1 {
-      if fixed_ev[i] >= 0 && fixed_ev[i] > 32 {
-        println(
-          "Error: SP values must be 0-32, got " + fixed_ev[i].to_string(),
-        )
-        return
+      if fixed_ev[i] >= 0 {
+        if fixed_ev[i] > 32 {
+          println(
+            "Error: SP values must be 0-32, got " + fixed_ev[i].to_string(),
+          )
+          return
+        }
+        fixed_total = fixed_total + fixed_ev[i]
       }
+    }
+    if fixed_total > 66 {
+      println(
+        "Error: total fixed SP (" +
+        fixed_total.to_string() +
+        ") exceeds Champions budget of 66",
+      )
+      return
     }
     with_db(fn(db) {
       match @db.query_pokemon(db, name, game.version) {
