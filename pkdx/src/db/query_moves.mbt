@@ -39,6 +39,8 @@ fn query_moves_champions(
     #|JOIN local_waza_language wl ON cl.waza = wl.waza
     #|  AND wl.version = 'Champions' AND wl.language = 'jpn'
     #|WHERE cl.globalNo = ?
+    #|  AND COALESCE(cl.form, '') = '' AND COALESCE(cl.region, '') = ''
+    #|  AND COALESCE(cl.mega_evolution, '') = '' AND COALESCE(cl.gigantamax, '') = ''
   let sql_tail =
     #|ORDER BY power DESC
   let sql = sql_head + state_filter + "\n" + sql_tail
