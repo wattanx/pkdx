@@ -1,0 +1,12 @@
+import {
+  "ushironoko/pkdx/src/nash" @nash,
+}
+
+import {
+  "moonbitlang/core/math" @math,
+} for "test"
+
+options(
+  link: { "native": { "cc-link-flags": "-framework Accelerate" } },
+  "supported-targets": "native",
+)

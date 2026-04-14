@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/core/math" @math,
+  "moonbitlang/core/double" @double,
+}
+
+import {
+  "mizchi/numbt" @numbt,
+} for "test"
+
+options(
+  link: { "native": { "cc-link-flags": "-framework Accelerate" } },
+  "supported-targets": "native",
+)
