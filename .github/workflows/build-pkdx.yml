@@ -41,11 +41,25 @@ jobs:
           irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
           echo "$env:USERPROFILE\.moon\bin" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
 
+      - name: Install BLAS (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenblas-dev liblapack-dev
+
       - name: Build
         working-directory: pkdx
+        env:
+          # Linux requires OpenBLAS/LAPACK instead of macOS Accelerate.
+          # Windows is not supported for nash/select/meta-divergence; the
+          # upstream BLAS FFI stub currently assumes macOS or Linux. CI
+          # continues to attempt a native build on Windows as a best-effort,
+          # and the downstream feature-gate in `bin/pkdx.cmd` hides the
+          # unsupported subcommands on that platform.
+          MOON_CC_LINK_FLAGS: ${{ runner.os == 'Linux' && '-lopenblas -llapack -lm' || '' }}
         run: |
           moon update
-          moon build --target native
+          moon build --target native src/main
         shell: bash
 
       - name: Copy binary (Unix)

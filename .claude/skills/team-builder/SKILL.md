@@ -629,6 +629,43 @@ megaメカニクスが有効な場合:
 - メガ後の種族値・タイプ・特性を取得して比較
 - AskUserQuestionで確定
 
+### 7-6: Nash 均衡による選出分布の提示（任意）
+
+選出最適化をデータ駆動で裏取りしたい場合、`pkdx select` を呼び出して
+`PayoffModel=Best1v1` で選出単位の Nash 均衡分布を取得する。手作業の選出提案
+（7-3）と突き合わせ、乖離があれば再検討する。
+
+**入力**: 自軍 6 体 + 想定される仮想敵 6 体（Phase 6 で確定済）。
+
+**前提**: nash 系サブコマンドは macOS/Linux のみ対応（Windows では非対応）。
+
+```bash
+# 仮想敵リストも含めた team JSON を構築し stdin で渡す。
+cat <<'JSON' | $PKDX select
+{
+  "team": [
+    {"name":"<name>","type1":"<t1>","type2":"<t2>","hp":<h>,"atk":<a>,"def":<b>,
+     "spa":<c>,"spd":<d>,"spe":<s>,"ability":"<abil>","item":"<item>","tera":"<tera>",
+     "moves":[{"name":"<mv>","type":"<t>","category":"physical|special","power":<p>}, ...]},
+    ... (6 体ぶん)
+  ],
+  "opponent": [ ... (仮想敵 6 体) ],
+  "format": "single"
+}
+JSON
+```
+
+出力の `row_strategy` は自軍選出 20 (single) または 15 (double) 通りの確率分布。
+確率 > 1% のセレクションを「推奨選出」として 7-3 の手選出と比較する。
+
+`value` と `exploitability` も併せて提示。`exploitability < 1e-6` なら解析解、
+それ以上なら LP が退化している可能性があるので結果を保守的に扱う。
+
+**注意**: 現バージョンは `ability`/`item`/`tera` を JSON で指定できるが、天候・
+ランク補正・フィールドは考慮されない。あくまで「技の生ダメージ + 素早さ」で
+の近似結果であることを明記して提示する。詳細は `.claude/skills/nash/SKILL.md`
+と `.claude/skills/nash/references/payoff_semantics.md` を参照。
+
 ---
 
 ## Phase 8: 構築レポート出力

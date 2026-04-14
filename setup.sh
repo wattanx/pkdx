@@ -82,6 +82,38 @@ else
   echo "  No patch runner found. Skipping."
 fi
 
+# --- Step 2.7: BLAS dependency (for nash / select / meta-divergence) ---
+# nash/select/meta-divergence 系サブコマンドは numbt / mizchi/blas 経由で BLAS
+# に依存する。OS 別に利用可否を案内し、必要な環境変数を echo する。
+echo "[2.7/5] BLAS dependency check..."
+case "$OS_TAG" in
+  darwin)
+    # macOS は Accelerate.framework が標準搭載。追加インストール不要。
+    echo "  macOS: Accelerate.framework is built in."
+    ;;
+  linux)
+    # OpenBLAS + LAPACK が必要。MOON_CC_LINK_FLAGS で cc-link-flags を上書き。
+    if command -v dpkg &>/dev/null && dpkg -s libopenblas-dev &>/dev/null && dpkg -s liblapack-dev &>/dev/null; then
+      echo "  Linux: libopenblas-dev + liblapack-dev detected."
+    elif command -v rpm &>/dev/null && rpm -q openblas-devel &>/dev/null; then
+      echo "  Linux: openblas-devel detected."
+    else
+      echo "  Linux: BLAS/LAPACK not detected. Install one of:"
+      echo "    Debian/Ubuntu: sudo apt-get install libopenblas-dev liblapack-dev"
+      echo "    RHEL/Fedora:   sudo dnf install openblas-devel lapack-devel"
+      echo "    (nash / select / meta-divergence will fail to build without them.)"
+    fi
+    echo "  When building locally, export the right link flags:"
+    echo "    export MOON_CC_LINK_FLAGS=\"-lopenblas -llapack -lm\""
+    ;;
+  windows)
+    # 現在 nash 系統は Windows 非対応。ビルドは失敗する可能性があるため警告。
+    echo "  Windows: nash / select / meta-divergence subcommands are NOT supported"
+    echo "    on this platform. The pre-built Windows release binary omits them;"
+    echo "    local builds will fail at link time without a Windows BLAS toolchain."
+    ;;
+esac
+
 # --- Step 3: pkdx binary ---
 echo "[3/5] Downloading pkdx binary ($BINARY_NAME)..."
 
