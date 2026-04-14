@@ -90,6 +90,8 @@ case "$OS_TAG" in
   darwin)
     # macOS は Accelerate.framework が標準搭載。追加インストール不要。
     echo "  macOS: Accelerate.framework is built in."
+    echo "  When building tests locally, export the link flag:"
+    echo "    export MOON_CC_LINK_FLAGS=\"-framework Accelerate\""
     ;;
   linux)
     # OpenBLAS + LAPACK が必要。MOON_CC_LINK_FLAGS で cc-link-flags を上書き。

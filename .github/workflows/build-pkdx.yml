@@ -50,13 +50,15 @@ jobs:
       - name: Build
         working-directory: pkdx
         env:
-          # Linux requires OpenBLAS/LAPACK instead of macOS Accelerate.
-          # Windows is not supported for nash/select/meta-divergence; the
-          # upstream BLAS FFI stub currently assumes macOS or Linux. CI
-          # continues to attempt a native build on Windows as a best-effort,
-          # and the downstream feature-gate in `bin/pkdx.cmd` hides the
-          # unsupported subcommands on that platform.
-          MOON_CC_LINK_FLAGS: ${{ runner.os == 'Linux' && '-lopenblas -llapack -lm' || '' }}
+          # The production binary does not link numbt/BLAS — nash/payoff import
+          # numbt `for test` only — so no BLAS link flag is strictly required
+          # here. We still export a platform-appropriate MOON_CC_LINK_FLAGS so
+          # that (a) any transitive dependency pulling BLAS is satisfied, and
+          # (b) `moon test` runs downstream of this step work without manual
+          # flag-setting. Windows is best-effort; the downstream feature-gate
+          # in `bin/pkdx.cmd` hides nash/select/meta-divergence on that
+          # platform.
+          MOON_CC_LINK_FLAGS: ${{ runner.os == 'Linux' && '-lopenblas -llapack -lm' || (runner.os == 'macOS' && '-framework Accelerate' || '') }}
         run: |
           moon update
           moon build --target native src/main

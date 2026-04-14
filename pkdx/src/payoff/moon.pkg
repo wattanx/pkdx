@@ -10,7 +10,7 @@ import {
   "moonbitlang/core/math" @math,
 } for "test"
 
+// payoff has no direct BLAS dep; nash/moon.pkg's note applies here too.
 options(
-  link: { "native": { "cc-link-flags": "-framework Accelerate" } },
   "supported-targets": "native",
 )

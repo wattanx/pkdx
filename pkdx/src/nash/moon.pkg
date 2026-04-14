@@ -7,7 +7,12 @@ import {
   "mizchi/numbt" @numbt,
 } for "test"
 
+// Main code (solver.mbt / simplex.mbt / fictitious.mbt / divergence.mbt) has no
+// BLAS / FFI dependency — numbt is imported "for test" only. Platform-specific
+// BLAS link flags (Accelerate on macOS, OpenBLAS on Linux) are supplied by
+// numbt's own moon.pkg when tests link it, or via the MOON_CC_LINK_FLAGS env
+// variable in CI. Hardcoding `-framework Accelerate` here would break Linux
+// and Windows native builds of pkdx.
 options(
-  link: { "native": { "cc-link-flags": "-framework Accelerate" } },
   "supported-targets": "native",
 )

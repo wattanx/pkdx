@@ -239,13 +239,77 @@ fn fmt_int_array(xs : Array[Int]) -> String {
 }
 
 ///|
+/// Escape a string for inclusion inside JSON string literals (RFC 8259 §7).
+/// Quotes, backslashes, and ASCII control characters are replaced with the
+/// appropriate escape sequence so that arbitrary labels / Pokemon names
+/// produce valid JSON.
+fn json_escape(s : String) -> String {
+  let hex_digits = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e',
+    'f',
+  ]
+  let mut out = ""
+  for ch in s {
+    let code = ch.to_int()
+    if ch == '"' {
+      out = out + "\\\""
+    } else if ch == '\\' {
+      out = out + "\\\\"
+    } else if code == 0x08 {
+      out = out + "\\b"
+    } else if code == 0x09 {
+      out = out + "\\t"
+    } else if code == 0x0A {
+      out = out + "\\n"
+    } else if code == 0x0C {
+      out = out + "\\f"
+    } else if code == 0x0D {
+      out = out + "\\r"
+    } else if code < 0x20 {
+      let hi = (code / 16) % 16
+      let lo = code % 16
+      out = out +
+        "\\u00" +
+        hex_digits[hi].to_string() +
+        hex_digits[lo].to_string()
+    } else {
+      out = out + ch.to_string()
+    }
+  }
+  out
+}
+
+///|
+/// Escape a string for inclusion inside DOT `"..."` quoted identifiers.
+/// Per Graphviz spec, only `"` and `\` require escaping; newlines remain but
+/// control characters below 0x20 other than newline/tab are stripped to keep
+/// the emitted DOT robust against exotic label input.
+fn dot_escape(s : String) -> String {
+  let mut out = ""
+  for ch in s {
+    let code = ch.to_int()
+    if ch == '"' {
+      out = out + "\\\""
+    } else if ch == '\\' {
+      out = out + "\\\\"
+    } else if code < 0x20 && code != 0x0A && code != 0x09 {
+      // drop other control chars
+      continue
+    } else {
+      out = out + ch.to_string()
+    }
+  }
+  out
+}
+
+///|
 fn fmt_string_array(xs : Array[String]) -> String {
   let mut s = "["
   for i in 0..<xs.length() {
     if i > 0 {
       s = s + ","
     }
-    s = s + "\"" + xs[i] + "\""
+    s = s + "\"" + json_escape(xs[i]) + "\""
   }
   s + "]"
 }
@@ -317,7 +381,7 @@ pub fn run_nash_graph(
   let (matrix, labels) = parse_nash_input(input_json)
   let mut out = "digraph payoff {\n"
   for i in 0..<matrix.rows() {
-    out = out + "  \"" + labels[i] + "\";\n"
+    out = out + "  \"" + dot_escape(labels[i]) + "\";\n"
   }
   for i in 0..<matrix.rows() {
     for j in 0..<matrix.cols() {
@@ -325,11 +389,11 @@ pub fn run_nash_graph(
       if v.abs() > threshold {
         out = out +
           "  \"" +
-          labels[i] +
+          dot_escape(labels[i]) +
           "\" -> \"" +
-          labels[j] +
+          dot_escape(labels[j]) +
           "\" [label=\"" +
-          v.to_string() +
+          dot_escape(v.to_string()) +
           "\"];\n"
       }
     }

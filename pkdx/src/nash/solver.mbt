@@ -137,15 +137,54 @@ pub fn solve_zero_sum(matrix : FiniteMatrix) -> LpResult raise SolverError {
   for j in 0..<cols {
     q[j] = x[j] / sum_x
   }
-  let row_strategy = match MixedStrategy::new(p) {
-    Ok(s) => s
-    Err(_) => MixedStrategy::uniform(rows)
-  }
-  let col_strategy = match MixedStrategy::new(q) {
-    Ok(s) => s
-    Err(_) => MixedStrategy::uniform(cols)
-  }
+  let row_strategy = sanitize_strategy(p, "row")
+  let col_strategy = sanitize_strategy(q, "col")
   Optimal(value~, row_strategy~, col_strategy~)
+}
+
+///|
+/// Clamp tiny floating-point noise (e.g. `-2.7e-17` from simplex in degenerate
+/// games) to zero and renormalize, then construct a `MixedStrategy`.
+///
+/// Tolerance is 1e-9 — anything more negative than that is treated as a real
+/// numerical failure and surfaced as `InconsistentGame`. The previous
+/// implementation silently fell back to `MixedStrategy::uniform`, which could
+/// replace a valid equilibrium with a completely different strategy.
+fn sanitize_strategy(
+  probs : Array[Double],
+  which : String,
+) -> MixedStrategy raise SolverError {
+  let n = probs.length()
+  let cleaned = Array::make(n, 0.0)
+  let mut sum = 0.0
+  let neg_tol = 1.0e-9
+  for i in 0..<n {
+    let v = probs[i]
+    if v.is_nan() {
+      raise InconsistentGame(which + " strategy contains NaN")
+    }
+    if v < -neg_tol {
+      raise InconsistentGame(
+        which + " strategy has negative component " + v.to_string(),
+      )
+    }
+    let c = if v < 0.0 { 0.0 } else { v }
+    cleaned[i] = c
+    sum += c
+  }
+  if sum <= 0.0 {
+    raise InconsistentGame(which + " strategy sums to zero after clamping")
+  }
+  for i in 0..<n {
+    cleaned[i] = cleaned[i] / sum
+  }
+  match MixedStrategy::new(cleaned) {
+    Ok(s) => s
+    Err(e) =>
+      raise InconsistentGame(
+        which + " strategy construction failed: " + e.to_string(),
+      )
+  }
 }
 
 ///|
