@@ -10,7 +10,9 @@ import {
   "moonbitlang/core/math" @math,
 } for "test"
 
-// payoff has no direct BLAS dep; nash/moon.pkg's note applies here too.
+// BLAS link is needed for `moon test` to link against nash + numbt stubs.
+// See nash/moon.pkg for the full rationale; CI overrides this flag on Linux.
 options(
+  link: { "native": { "cc-link-flags": "-framework Accelerate" } },
   "supported-targets": "native",
 )
