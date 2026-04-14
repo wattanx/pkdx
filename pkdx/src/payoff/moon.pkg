@@ -1,5 +1,9 @@
 import {
   "ushironoko/pkdx/src/nash" @nash,
+  "ushironoko/pkdx/src/model" @model,
+  "ushironoko/pkdx/src/damage" @damage,
+  "moonbitlang/core/double" @double,
+  "moonbitlang/core/json" @json,
 }
 
 import {
