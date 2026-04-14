@@ -1,6 +1,65 @@
 ///|
 /// Query Pokemon that can learn a given move (level-up + TM).
+/// For champions version, reads from champions_learnset; other versions
+/// use local_pokedex_waza + local_pokedex_waza_machine.
+/// include_inactive: when true and version=champions, also includes
+/// moves marked state='inactive' (revoked in Champions).
 pub fn query_learners(
+  db : Db,
+  move_name : String,
+  version : String,
+  include_inactive~ : Bool = false,
+) -> Result[Array[SearchResult], String] {
+  if version == "champions" {
+    query_learners_champions(db, move_name, include_inactive)
+  } else {
+    query_learners_legacy(db, move_name, version)
+  }
+}
+
+///|
+fn query_learners_champions(
+  db : Db,
+  move_name : String,
+  include_inactive : Bool,
+) -> Result[Array[SearchResult], String] {
+  let state_filter = if include_inactive {
+    ""
+  } else {
+    " AND cl.state = 'active'"
+  }
+  let sql_head =
+    #|WITH learners AS (
+    #|  SELECT cl.globalNo
+    #|  FROM local_waza_language wl
+    #|  JOIN champions_learnset cl ON wl.waza = cl.waza
+    #|  WHERE wl.language = 'jpn' AND wl.name = ? AND wl.version = 'Champions'
+    #|    AND COALESCE(cl.form, '') = '' AND COALESCE(cl.region, '') = ''
+    #|    AND COALESCE(cl.mega_evolution, '') = '' AND COALESCE(cl.gigantamax, '') = ''
+  let sql_tail =
+    #|)
+    #|SELECT l.globalNo, MIN(pn.name) AS name_ja,
+    #|       t.type1, t.type2,
+    #|       s.hp, s.attack, s.defense, s.special_attack, s.special_defense, s.speed,
+    #|       (s.hp + s.attack + s.defense + s.special_attack + s.special_defense + s.speed) AS bst
+    #|FROM learners l
+    #|JOIN pokedex p ON l.globalNo = p.globalNo
+    #|JOIN local_pokedex_type t ON p.globalNo = t.globalNo AND t.version = 'champions'
+    #|JOIN local_pokedex_status s ON p.globalNo = s.globalNo AND s.version = 'champions'
+    #|JOIN pokedex_name pn ON p.globalNo = pn.globalNo AND pn.language = 'jpn'
+    #|  AND COALESCE(pn.form, '') = '' AND COALESCE(pn.region, '') = ''
+    #|  AND COALESCE(pn.mega_evolution, '') = '' AND COALESCE(pn.gigantamax, '') = ''
+    #|WHERE COALESCE(p.form, '') = '' AND COALESCE(p.region, '') = ''
+    #|  AND COALESCE(p.mega_evolution, '') = '' AND COALESCE(p.gigantamax, '') = ''
+    #|GROUP BY l.globalNo
+    #|ORDER BY bst DESC
+  let sql = sql_head + state_filter + "\n" + sql_tail
+  let binds = [move_name]
+  collect_learners_rows(db, sql, binds)
+}
+
+///|
+fn query_learners_legacy(
   db : Db,
   move_name : String,
   version : String,
@@ -37,12 +96,19 @@ pub fn query_learners(
     #|  AND COALESCE(p.mega_evolution, '') = '' AND COALESCE(p.gigantamax, '') = ''
     #|GROUP BY l.globalNo
     #|ORDER BY bst DESC
-  // CTE binds: level-up(waza_ver, move_name, waza_ver) + TM(waza_ver, waza_ver, move_name, waza_ver)
-  // Outer binds: type(version), status(version)
   let binds = [
     waza_ver, move_name, waza_ver, waza_ver, waza_ver, move_name, waza_ver,
     version, version,
   ]
+  collect_learners_rows(db, sql, binds)
+}
+
+///|
+fn collect_learners_rows(
+  db : Db,
+  sql : String,
+  binds : Array[String],
+) -> Result[Array[SearchResult], String] {
   let rows = match query(db, sql, binds) {
     Ok(r) => r
     Err(e) => return Err(e)

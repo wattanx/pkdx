@@ -22,6 +22,9 @@ QUERIES = {
   'local_waza'            => "SELECT COUNT(*) FROM local_waza WHERE version='Champions'",
   'local_waza_language'   => "SELECT COUNT(*) FROM local_waza_language WHERE version='Champions'",
   'local_pokedex_waza'    => "SELECT COUNT(*) FROM local_pokedex_waza WHERE version='Champions'",
+  'champions_learnset_total'    => "SELECT COUNT(*) FROM champions_learnset",
+  'champions_learnset_active'   => "SELECT COUNT(*) FROM champions_learnset WHERE state='active'",
+  'champions_learnset_inactive' => "SELECT COUNT(*) FROM champions_learnset WHERE state='inactive'",
   'pokedex (new megas)'   => "SELECT COUNT(*) FROM pokedex WHERE id IN ('0358_00000100_0_000_0','0623_00000100_0_000_0','0670_00000100_0_000_0','0678_00000100_0_000_0','0740_00000100_0_000_0','0952_00000100_0_000_0','0970_00000100_0_000_0')",
   'pkdx_migrations'       => "SELECT COUNT(*) FROM pkdx_migrations",
   'waza_duplicates'       => "SELECT COUNT(*) FROM (SELECT waza, COUNT(*) as c FROM local_waza WHERE version='Champions' GROUP BY waza HAVING c > 1)",
@@ -50,6 +53,16 @@ puts ''
 
 # --- テスト1: 既存DBに対する再適用（全パッチ適用済み） ---
 puts '--- Test 1: Re-apply on already-patched DB ---'
+
+# 新規パッチが含むスキーマ（例: champions_learnset）が snapshot クエリで参照されても
+# 失敗しないよう、先に一度 apply.rb を走らせて全パッチを適用済み状態にする。
+ok_pre, output_pre = run_apply(ORIGINAL_DB)
+unless ok_pre
+  puts "  FAIL: pre-apply failed"
+  puts output_pre
+  exit 1
+end
+
 snapshot_before = snapshot(ORIGINAL_DB)
 
 # pkdx_migrations を削除して再適用するのではなく、
@@ -94,6 +107,8 @@ begin
   tmp.execute("DELETE FROM local_waza WHERE version='Champions'")
   tmp.execute("DELETE FROM local_waza_language WHERE version='Champions'")
   tmp.execute("DELETE FROM local_pokedex_waza WHERE version='Champions'")
+  # 005 が作成するテーブル — 存在する場合はドロップして 005 の新規適用を検証
+  tmp.execute('DROP TABLE IF EXISTS champions_learnset')
   %w[0358 0623 0670 0678 0740 0952 0970].each do |gno|
     id = "#{gno}_00000100_0_000_0"
     tmp.execute('DELETE FROM pokedex WHERE id = ?', [id])

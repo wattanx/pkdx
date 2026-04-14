@@ -158,7 +158,15 @@ fn cmd_moves() -> @admiral.CommandDef {
   @admiral.command(
     name="moves",
     description="List moves a Pokemon can learn",
-    options=[version_option(), regulation_option(), format_option()],
+    options=[
+      version_option(),
+      regulation_option(),
+      format_option(),
+      @admiral.bool(
+        "include-inactive",
+        description="Include Champions confiscated moves (state=inactive)",
+      ),
+    ],
     positionals=[
       @admiral.positional(
         "target",
@@ -167,7 +175,12 @@ fn cmd_moves() -> @admiral.CommandDef {
       ),
     ],
     run=Some(fn(ctx) {
-      run_moves(ctx_str(ctx, "target"), ctx_game(ctx), ctx_format(ctx))
+      run_moves(
+        ctx_str(ctx, "target"),
+        ctx_game(ctx),
+        ctx_format(ctx),
+        ctx.get_bool("include-inactive"),
+      )
     }),
   )
 }
@@ -518,6 +531,7 @@ fn run_moves(
   target : String,
   game : GameContext,
   format : @cli.OutputFormat,
+  include_inactive : Bool,
 ) -> Unit {
   with_db(fn(db) {
     let global_no = if is_numeric(target) {
@@ -531,7 +545,8 @@ fn run_moves(
         }
       }
     }
-    match @db.query_moves(db, global_no, game.version) {
+    let r = @db.query_moves(db, global_no, game.version, include_inactive~)
+    match r {
       Ok(moves) => println(@cli.format_moves(moves, format))
       Err(e) => println("Error: " + e)
     }
@@ -571,6 +586,10 @@ fn cmd_learners() -> @admiral.CommandDef {
       regulation_option(),
       format_option(),
       @admiral.int("limit", description="Max results (default 50)", default=Some(50)),
+      @admiral.bool(
+        "include-inactive",
+        description="Include Champions confiscated moves (state=inactive)",
+      ),
     ],
     positionals=[
       @admiral.positional(
@@ -585,6 +604,7 @@ fn cmd_learners() -> @admiral.CommandDef {
         ctx_int(ctx, "limit"),
         ctx_game(ctx),
         ctx_format(ctx),
+        ctx.get_bool("include-inactive"),
       )
     }),
   )
@@ -596,9 +616,11 @@ fn run_learners(
   limit : Int,
   game : GameContext,
   format : @cli.OutputFormat,
+  include_inactive : Bool,
 ) -> Unit {
   with_db(fn(db) {
-    match @db.query_learners(db, move_name, game.version) {
+    let r = @db.query_learners(db, move_name, game.version, include_inactive~)
+    match r {
       Ok(results) => {
         let filtered = if game.regulation != "" {
           results.filter(fn(p) { @db.is_available(p.global_no, game.regulation) })
