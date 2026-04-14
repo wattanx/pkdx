@@ -22,6 +22,7 @@ pub suberror NashCliError {
   MissingField(String)
   ConflictingInputs
   NonSquareMatrix(Int, Int)
+  LabelCountMismatch(Int, Int)
   InfeasibleGame
   UnboundedGame
   InnerError(String)
@@ -138,6 +139,9 @@ fn parse_labels(
       arr
     }
     Some(Array(arr)) => {
+      if arr.length() != default_count {
+        raise LabelCountMismatch(default_count, arr.length())
+      }
       let result = Array::make(arr.length(), "")
       for i in 0..<arr.length() {
         result[i] = json_string(arr[i], "labels[" + i.to_string() + "]")
@@ -281,9 +285,10 @@ fn json_escape(s : String) -> String {
 
 ///|
 /// Escape a string for inclusion inside DOT `"..."` quoted identifiers.
-/// Per Graphviz spec, only `"` and `\` require escaping; newlines remain but
-/// control characters below 0x20 other than newline/tab are stripped to keep
-/// the emitted DOT robust against exotic label input.
+/// Quotes and backslashes get backslash-escaped; literal newline/tab/carriage
+/// return are converted to the two-character escape sequences (\n, \t, \r) so
+/// labels containing raw control characters still produce syntactically valid
+/// DOT. Other ASCII control characters below 0x20 are dropped.
 fn dot_escape(s : String) -> String {
   let mut out = ""
   for ch in s {
@@ -292,8 +297,13 @@ fn dot_escape(s : String) -> String {
       out = out + "\\\""
     } else if ch == '\\' {
       out = out + "\\\\"
-    } else if code < 0x20 && code != 0x0A && code != 0x09 {
-      // drop other control chars
+    } else if code == 0x0A {
+      out = out + "\\n"
+    } else if code == 0x0D {
+      out = out + "\\r"
+    } else if code == 0x09 {
+      out = out + "\\t"
+    } else if code < 0x20 {
       continue
     } else {
       out = out + ch.to_string()

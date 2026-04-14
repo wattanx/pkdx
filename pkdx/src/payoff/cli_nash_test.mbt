@@ -157,3 +157,29 @@ test "nash_graph_node_labels_match_input" {
   assert_true(numbered.contains("\"0\""))
   assert_true(numbered.contains("\"2\""))
 }
+
+///|
+test "nash_solve_rejects_short_labels" {
+  let bad = "{\"matrix\":[[0,1],[-1,0]],\"labels\":[\"A\"]}"
+  let err = try? run_nash_solve(bad)
+  assert_true(err is Err(LabelCountMismatch(2, 1)))
+}
+
+///|
+test "nash_graph_rejects_short_labels" {
+  let bad = "{\"matrix\":[[0,1],[-1,0]],\"labels\":[\"A\"]}"
+  let err = try? run_nash_graph(bad, 0.5)
+  assert_true(err is Err(LabelCountMismatch(2, 1)))
+}
+
+///|
+test "nash_graph_escapes_control_chars_in_labels" {
+  // Label contains a literal newline, tab, and carriage return.
+  let with_ctrl =
+    "{\"matrix\":[[0,1,-1],[-1,0,1],[1,-1,0]],\"labels\":[\"A\\nX\",\"B\\tY\",\"C\\rZ\"]}"
+  let out = run_nash_graph(with_ctrl, 0.5)
+  // Must emit escaped sequences, never raw control chars inside quoted ids.
+  assert_true(out.contains("\"A\\nX\""))
+  assert_true(out.contains("\"B\\tY\""))
+  assert_true(out.contains("\"C\\rZ\""))
+}

@@ -1377,6 +1377,11 @@ fn nash_cli_error_message(err : @payoff.NashCliError) -> String {
     ConflictingInputs => "both matrix and characters provided; pick one"
     NonSquareMatrix(r, c) =>
       "matrix is not square: " + r.to_string() + "x" + c.to_string()
+    LabelCountMismatch(expected, got) =>
+      "labels length mismatch: expected " +
+      expected.to_string() +
+      ", got " +
+      got.to_string()
     InfeasibleGame => "game is infeasible"
     UnboundedGame => "game is unbounded"
     InnerError(msg) => "solver error: " + msg
