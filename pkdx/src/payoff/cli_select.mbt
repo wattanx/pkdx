@@ -494,6 +494,13 @@ pub fn run_select(input_json : String) -> String raise NashCliError {
         None => Pairwise(Best1v1)
       }
   }
+  match (format, team_model) {
+    (Double, SwitchingGame(_)) =>
+      raise InvalidJson(
+        "switching_game does not support double format (single-active model only)",
+      )
+    _ => ()
+  }
   let r = compute_select_with_team_model(team, opp, format, team_model)
   let mut out = "{"
   out = out + "\"format\":\"" + format_label(r.format) + "\""

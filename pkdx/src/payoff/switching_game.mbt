@@ -391,15 +391,51 @@ pub fn transition_with_cache(
         opp_team,
       )
       if s == 0 {
-        // Simultaneous: both sides' damage applied independently.
-        opp_hps_new[state.opp_active] = clamp_zero(
-          opp_hps_new[state.opp_active] - dmg_mo,
+        // Speed tie: resolve as 50% chance each side moves first.
+        // Build both orderings and return the state whose HP arrays
+        // are the element-wise average (rounded down), preserving the
+        // unbiased expectation without an RNG dependency.
+        let my_hps_a = my_hps_new.copy()
+        let opp_hps_a = opp_hps_new.copy()
+        let my_ranks_a = my_ranks_new.copy()
+        let opp_ranks_a = opp_ranks_new.copy()
+        // branch A: my side first
+        opp_hps_a[state.opp_active] = clamp_zero(
+          opp_hps_a[state.opp_active] - dmg_mo,
         )
-        my_hps_new[state.my_active] = clamp_zero(
-          my_hps_new[state.my_active] - dmg_om,
+        apply_stat_boost(my_ranks_a, mv_me)
+        if opp_hps_a[state.opp_active] > 0 {
+          my_hps_a[state.my_active] = clamp_zero(
+            my_hps_a[state.my_active] - dmg_om,
+          )
+          apply_stat_boost(opp_ranks_a, mv_opp)
+        }
+        let my_hps_b = state.my_hps.copy()
+        let opp_hps_b = state.opp_hps.copy()
+        let my_ranks_b = state.my_ranks.copy()
+        let opp_ranks_b = state.opp_ranks.copy()
+        // branch B: opp side first
+        my_hps_b[state.my_active] = clamp_zero(
+          my_hps_b[state.my_active] - dmg_om,
         )
-        apply_stat_boost(my_ranks_new, mv_me)
-        apply_stat_boost(opp_ranks_new, mv_opp)
+        apply_stat_boost(opp_ranks_b, mv_opp)
+        if my_hps_b[state.my_active] > 0 {
+          opp_hps_b[state.opp_active] = clamp_zero(
+            opp_hps_b[state.opp_active] - dmg_mo,
+          )
+          apply_stat_boost(my_ranks_b, mv_me)
+        }
+        // Average the two branches (floor division).
+        for k in 0..<my_hps_new.length() {
+          my_hps_new[k] = (my_hps_a[k] + my_hps_b[k]) / 2
+        }
+        for k in 0..<opp_hps_new.length() {
+          opp_hps_new[k] = (opp_hps_a[k] + opp_hps_b[k]) / 2
+        }
+        for k in 0..<5 {
+          my_ranks_new[k] = (my_ranks_a[k] + my_ranks_b[k]) / 2
+          opp_ranks_new[k] = (opp_ranks_a[k] + opp_ranks_b[k]) / 2
+        }
       } else if s > 0 {
         // My active attacks first. Rank-ups on my side apply regardless of
         // whether the move damages (status moves).

@@ -198,8 +198,16 @@ pub fn team_payoff_matrix_with_team_model(
 ) -> @nash.FiniteMatrix raise PayoffError {
   match team_model {
     Pairwise(model) => team_payoff_matrix(team_a, team_b, format, model)
-    SwitchingGame(turn_limit) =>
+    SwitchingGame(turn_limit) => {
+      match format {
+        Double =>
+          raise UnsupportedFormat(
+            "switching_game does not support double format (single-active model only)",
+          )
+        Single => ()
+      }
       team_payoff_matrix_switching(team_a, team_b, format, turn_limit)
+    }
   }
 }
 

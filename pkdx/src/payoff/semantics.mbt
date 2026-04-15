@@ -43,4 +43,5 @@ pub(all) struct Combatant {
 pub suberror PayoffError {
   EmptyCombatants
   EmptyMoves(String)
+  UnsupportedFormat(String)
 } derive(Show)
