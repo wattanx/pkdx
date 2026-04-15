@@ -288,11 +288,76 @@ fn move_turn_sign(
 }
 
 ///|
+/// Resolve a turn where both sides use a move, with proper damage recomputation
+/// after the first actor's stat boosts. `my_first` determines action order.
+fn resolve_moves(
+  state : SwitchingGameState,
+  mi : Int,
+  mj : Int,
+  my_first : Bool,
+  my_team : Array[Combatant],
+  opp_team : Array[Combatant],
+  dmg_cache : DamageCache,
+) -> SwitchingGameState {
+  let my_hps = state.my_hps.copy()
+  let opp_hps = state.opp_hps.copy()
+  let my_ranks = state.my_ranks.copy()
+  let opp_ranks = state.opp_ranks.copy()
+  let mv_me = my_team[state.my_active].moves[mi]
+  let mv_opp = opp_team[state.opp_active].moves[mj]
+  if my_first {
+    let dmg_mo = mean_damage_cached(
+      dmg_cache, true, state.my_active, my_ranks, state.opp_active, opp_ranks,
+      mi, my_team, opp_team,
+    )
+    opp_hps[state.opp_active] = clamp_zero(opp_hps[state.opp_active] - dmg_mo)
+    apply_stat_boost(my_ranks, mv_me)
+    if opp_hps[state.opp_active] > 0 {
+      let dmg_om = mean_damage_cached(
+        dmg_cache, false, state.opp_active, opp_ranks, state.my_active, my_ranks,
+        mj, my_team, opp_team,
+      )
+      my_hps[state.my_active] = clamp_zero(my_hps[state.my_active] - dmg_om)
+      apply_stat_boost(opp_ranks, mv_opp)
+    }
+  } else {
+    let dmg_om = mean_damage_cached(
+      dmg_cache, false, state.opp_active, opp_ranks, state.my_active, my_ranks,
+      mj, my_team, opp_team,
+    )
+    my_hps[state.my_active] = clamp_zero(my_hps[state.my_active] - dmg_om)
+    apply_stat_boost(opp_ranks, mv_opp)
+    if my_hps[state.my_active] > 0 {
+      let dmg_mo = mean_damage_cached(
+        dmg_cache, true, state.my_active, my_ranks, state.opp_active, opp_ranks,
+        mi, my_team, opp_team,
+      )
+      opp_hps[state.opp_active] = clamp_zero(opp_hps[state.opp_active] - dmg_mo)
+      apply_stat_boost(my_ranks, mv_me)
+    }
+  }
+  {
+    my_active: state.my_active,
+    opp_active: state.opp_active,
+    my_hps,
+    opp_hps,
+    my_ranks,
+    opp_ranks,
+    turn: state.turn + 1,
+  }
+}
+
+///|
 /// Apply one game step to `state` given both players' actions, using
 /// `dmg_cache` to memoize the 16-roll damage computations. Damage is applied
 /// in action-order (priority → effective speed; first KO skips the slower
 /// side's attack), switches reset the switcher's ranks, stat-boost moves
 /// update the user's ranks. Always advances `turn` by 1.
+///
+/// Returns an array of `(probability, next_state)` pairs. For most actions
+/// there is exactly one outcome with probability 1.0. Speed ties produce two
+/// outcomes each with probability 0.5 so that the caller can average successor
+/// *values* rather than successor *states* (Jensen's inequality).
 pub fn transition_with_cache(
   state : SwitchingGameState,
   my_action : ActionKind,
@@ -300,7 +365,7 @@ pub fn transition_with_cache(
   my_team : Array[Combatant],
   opp_team : Array[Combatant],
   dmg_cache : DamageCache,
-) -> SwitchingGameState {
+) -> Array[(Double, SwitchingGameState)] {
   let my_hps_new = state.my_hps.copy()
   let opp_hps_new = state.opp_hps.copy()
   let mut my_active_new = state.my_active
@@ -368,102 +433,23 @@ pub fn transition_with_cache(
       let s = move_turn_sign(
         me, my_ranks_new, mv_me, opp, opp_ranks_new, mv_opp,
       )
-      let dmg_mo = mean_damage_cached(
-        dmg_cache,
-        true,
-        state.my_active,
-        my_ranks_new,
-        state.opp_active,
-        opp_ranks_new,
-        mi,
-        my_team,
-        opp_team,
-      )
-      let dmg_om = mean_damage_cached(
-        dmg_cache,
-        false,
-        state.opp_active,
-        opp_ranks_new,
-        state.my_active,
-        my_ranks_new,
-        mj,
-        my_team,
-        opp_team,
-      )
       if s == 0 {
-        // Speed tie: resolve as 50% chance each side moves first.
-        // Build both orderings and return the state whose HP arrays
-        // are the element-wise average (rounded down), preserving the
-        // unbiased expectation without an RNG dependency.
-        let my_hps_a = my_hps_new.copy()
-        let opp_hps_a = opp_hps_new.copy()
-        let my_ranks_a = my_ranks_new.copy()
-        let opp_ranks_a = opp_ranks_new.copy()
-        // branch A: my side first
-        opp_hps_a[state.opp_active] = clamp_zero(
-          opp_hps_a[state.opp_active] - dmg_mo,
-        )
-        apply_stat_boost(my_ranks_a, mv_me)
-        if opp_hps_a[state.opp_active] > 0 {
-          my_hps_a[state.my_active] = clamp_zero(
-            my_hps_a[state.my_active] - dmg_om,
-          )
-          apply_stat_boost(opp_ranks_a, mv_opp)
-        }
-        let my_hps_b = state.my_hps.copy()
-        let opp_hps_b = state.opp_hps.copy()
-        let my_ranks_b = state.my_ranks.copy()
-        let opp_ranks_b = state.opp_ranks.copy()
-        // branch B: opp side first
-        my_hps_b[state.my_active] = clamp_zero(
-          my_hps_b[state.my_active] - dmg_om,
-        )
-        apply_stat_boost(opp_ranks_b, mv_opp)
-        if my_hps_b[state.my_active] > 0 {
-          opp_hps_b[state.opp_active] = clamp_zero(
-            opp_hps_b[state.opp_active] - dmg_mo,
-          )
-          apply_stat_boost(my_ranks_b, mv_me)
-        }
-        // Average the two branches (floor division).
-        for k in 0..<my_hps_new.length() {
-          my_hps_new[k] = (my_hps_a[k] + my_hps_b[k]) / 2
-        }
-        for k in 0..<opp_hps_new.length() {
-          opp_hps_new[k] = (opp_hps_a[k] + opp_hps_b[k]) / 2
-        }
-        for k in 0..<5 {
-          my_ranks_new[k] = (my_ranks_a[k] + my_ranks_b[k]) / 2
-          opp_ranks_new[k] = (opp_ranks_a[k] + opp_ranks_b[k]) / 2
-        }
-      } else if s > 0 {
-        // My active attacks first. Rank-ups on my side apply regardless of
-        // whether the move damages (status moves).
-        opp_hps_new[state.opp_active] = clamp_zero(
-          opp_hps_new[state.opp_active] - dmg_mo,
-        )
-        apply_stat_boost(my_ranks_new, mv_me)
-        if opp_hps_new[state.opp_active] > 0 {
-          my_hps_new[state.my_active] = clamp_zero(
-            my_hps_new[state.my_active] - dmg_om,
-          )
-          apply_stat_boost(opp_ranks_new, mv_opp)
-        }
+        // Speed tie: return two outcomes so the caller averages successor
+        // *values* (not states). resolve_moves recomputes the second hit's
+        // damage after the first actor's stat boosts.
+        return [
+          (0.5, resolve_moves(state, mi, mj, true, my_team, opp_team, dmg_cache)),
+          (0.5, resolve_moves(state, mi, mj, false, my_team, opp_team, dmg_cache)),
+        ]
       } else {
-        my_hps_new[state.my_active] = clamp_zero(
-          my_hps_new[state.my_active] - dmg_om,
-        )
-        apply_stat_boost(opp_ranks_new, mv_opp)
-        if my_hps_new[state.my_active] > 0 {
-          opp_hps_new[state.opp_active] = clamp_zero(
-            opp_hps_new[state.opp_active] - dmg_mo,
-          )
-          apply_stat_boost(my_ranks_new, mv_me)
-        }
+        let my_first = s > 0
+        return [
+          (1.0, resolve_moves(state, mi, mj, my_first, my_team, opp_team, dmg_cache)),
+        ]
       }
     }
   }
-  {
+  [(1.0, {
     my_active: my_active_new,
     opp_active: opp_active_new,
     my_hps: my_hps_new,
@@ -471,7 +457,7 @@ pub fn transition_with_cache(
     my_ranks: my_ranks_new,
     opp_ranks: opp_ranks_new,
     turn: state.turn + 1,
-  }
+  })]
 }
 
 ///|
@@ -486,9 +472,10 @@ pub fn transition(
   my_team : Array[Combatant],
   opp_team : Array[Combatant],
 ) -> SwitchingGameState {
-  transition_with_cache(
+  let outcomes = transition_with_cache(
     state, my_action, opp_action, my_team, opp_team, new_damage_cache(),
   )
+  outcomes[0].1
 }
 
 ///|
@@ -531,12 +518,17 @@ pub fn value(
   }
   for i in 0..<actions_me.length() {
     for j in 0..<actions_opp.length() {
-      let next = transition_with_cache(
+      let outcomes = transition_with_cache(
         state, actions_me[i], actions_opp[j], my_team, opp_team, dmg_cache,
       )
-      data[i][j] = value(
-        next, my_team, opp_team, turn_limit, cache, stats, dmg_cache,
-      )
+      let mut ev = 0.0
+      for outcome in outcomes {
+        let (prob, next) = outcome
+        ev += prob * value(
+          next, my_team, opp_team, turn_limit, cache, stats, dmg_cache,
+        )
+      }
+      data[i][j] = ev
     }
   }
   let m = match @nash.FiniteMatrix::new(data) {
