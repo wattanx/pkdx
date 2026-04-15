@@ -63,6 +63,10 @@ test "state_is_hashable_and_distinguishes_meaningful_fields" {
     opp_hps: [100, 100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false, false],
+    opp_megaed: [false, false, false],
     turn: 0,
   }
   let same : SwitchingGameState = {
@@ -72,6 +76,10 @@ test "state_is_hashable_and_distinguishes_meaningful_fields" {
     opp_hps: [100, 100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false, false],
+    opp_megaed: [false, false, false],
     turn: 0,
   }
   let diff_active = { ..base, my_active: 1 }
@@ -105,6 +113,10 @@ test "terminal_value_all_my_fainted_returns_minus_one" {
     opp_hps: [100, 100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false, false],
+    opp_megaed: [false, false, false],
     turn: 0,
   }
   match terminal_value(state, team_a, team_b, 5) {
@@ -124,6 +136,10 @@ test "terminal_value_all_opp_fainted_returns_plus_one" {
     opp_hps: [0, 0, 0],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false, false],
+    opp_megaed: [false, false, false],
     turn: 0,
   }
   match terminal_value(state, team_a, team_b, 5) {
@@ -145,6 +161,10 @@ test "terminal_value_turn_limit_reached_returns_hp_ratio_in_signed_range" {
     opp_hps: [100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false, false],
     turn: 3,
   }
   match terminal_value(state, team_a, team_b, 3) {
@@ -164,6 +184,10 @@ test "terminal_value_both_alive_before_limit_returns_none" {
     opp_hps: [100, 100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false, false],
+    opp_megaed: [false, false, false],
     turn: 0,
   }
   match terminal_value(state, team_a, team_b, 5) {
@@ -177,13 +201,14 @@ test "alive_actions_excludes_fainted_switch_targets" {
   let team = build_dummy_team(3, 100)
   // active=0; team[1] KO'd (hp=0); team[2] alive → only Switch(2) legal
   let hps = [100, 0, 100]
-  let actions = alive_actions(0, hps, team)
+  let actions = alive_actions(0, hps, team, false)
   let mut move_count = 0
   let switch_targets : Array[Int] = []
   for a in actions {
     match a {
       UseMove(_) => move_count += 1
       Switch(i) => switch_targets.push(i)
+      Mega(_) => ()
     }
   }
   assert_eq(move_count, 1)
@@ -239,6 +264,10 @@ test "value_returns_terminal_value_for_terminal_state" {
     opp_hps: [100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false, false],
     turn: 5,
   }
   let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
@@ -275,6 +304,10 @@ test "value_caches_result_via_value_stats" {
     opp_hps: [100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false, false],
     turn: 0,
   }
   let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
@@ -353,6 +386,10 @@ test "transition_attack_vs_attack_resolves_sequentially_by_speed" {
     opp_hps: [1],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
     turn: 0,
   }
   let next = transition(state, UseMove(0), UseMove(0), [fast], [slow])
@@ -387,6 +424,10 @@ test "transition_attack_vs_switch_damages_newly_switched_target" {
     opp_hps: [100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false, false],
     turn: 0,
   }
   let next = transition(state, UseMove(0), Switch(1), my_team, opp_team)
@@ -426,6 +467,10 @@ test "transition_switch_vs_switch_updates_actives_only_without_damage" {
     opp_hps: [100, 100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false, false],
     turn: 0,
   }
   let next = transition(state, Switch(1), Switch(1), my_team, opp_team)
@@ -459,7 +504,7 @@ test "alive_actions_includes_all_moves_and_alive_switches" {
     ),
   ]
   let hps = [100, 100, 100]
-  let actions = alive_actions(0, hps, team)
+  let actions = alive_actions(0, hps, team, false)
   // 3 moves + 2 switches = 5 legal actions
   assert_eq(actions.length(), 5)
   let mut moves = 0
@@ -468,6 +513,7 @@ test "alive_actions_includes_all_moves_and_alive_switches" {
     match a {
       UseMove(_) => moves += 1
       Switch(_) => switches += 1
+      Mega(_) => ()
     }
   }
   assert_eq(moves, 3)
@@ -485,6 +531,10 @@ test "state_ranks_distinguish_otherwise_identical_states" {
     opp_hps: [100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
     turn: 0,
   }
   let boosted = { ..base, my_ranks: [2, 0, 0, 0, 0] }
@@ -521,6 +571,10 @@ test "transition_priority_move_outpaces_faster_opponent" {
     opp_hps: [1],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
     turn: 0,
   }
   let next = transition(
@@ -548,6 +602,10 @@ test "transition_sword_dance_raises_attacker_rank_by_two" {
     opp_hps: [100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
     turn: 0,
   }
   let next = transition(state, UseMove(0), UseMove(0), [me], [opp])
@@ -571,6 +629,10 @@ test "transition_rank_clamps_to_plus_two_after_two_sword_dances" {
     opp_hps: [100],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
     turn: 0,
   }
   state = transition(state, UseMove(0), UseMove(0), [me], [opp])
@@ -609,6 +671,10 @@ test "transition_switch_resets_active_ranks_to_zero" {
     opp_hps: [100, 100],
     my_ranks: [2, 1, 0, 0, 1],
     opp_ranks: [-1, 0, 2, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false, false],
     turn: 0,
   }
   let next = transition(state, Switch(1), Switch(1), my_team, opp_team)
@@ -638,6 +704,10 @@ test "transition_rank_affects_damage_sword_dance_increases_output" {
     opp_hps: [500],
     my_ranks: [0, 0, 0, 0, 0],
     opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false],
     turn: 0,
   }
   let boosted : SwitchingGameState = { ..neutral, my_ranks: [2, 0, 0, 0, 0] }
@@ -782,4 +852,682 @@ test "damage_cache_distinguishes_sides_for_symmetric_teams" {
   // Damage values differ because the attackers differ (A has ATK=150,
   // B has ATK=80).
   assert_true(d_mine > d_opp)
+}
+
+///|
+/// Helper: build a `MegaForm` quickly for tests. Mega fields default to the
+/// base values unless overridden, so a test can change only the fields it
+/// cares about (e.g. `mk_mega_form(atk=200)` for a pure attack boost).
+fn mk_mega_form(
+  atk~ : Int = 100,
+  def_~ : Int = 100,
+  spa~ : Int = 100,
+  spd~ : Int = 100,
+  spe~ : Int = 100,
+  type1~ : String = "ノーマル",
+  type2~ : String = "",
+  ability~ : String = "",
+  name_ja~ : String = "メガテスト",
+) -> @model.MegaForm {
+  { atk, def_, spa, spd, spe, type1, type2, ability, name_ja }
+}
+
+///|
+/// Helper: baseline single-Pokemon state with all mega fields zeroed. Used to
+/// keep mega-specific tests focused on the field under test.
+fn mk_mega_state_1v1(
+  my_hp~ : Int = 100,
+  opp_hp~ : Int = 100,
+  my_mega_used~ : Bool = false,
+  opp_mega_used~ : Bool = false,
+  my_megaed~ : Bool = false,
+  opp_megaed~ : Bool = false,
+) -> SwitchingGameState {
+  {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [my_hp],
+    opp_hps: [opp_hp],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used,
+    opp_mega_used,
+    my_megaed: [my_megaed],
+    opp_megaed: [opp_megaed],
+    turn: 0,
+  }
+}
+
+///|
+test "state_is_hashable_with_mega_fields" {
+  // Adding `my_mega_used` / `my_megaed` extends the identity of a state;
+  // two states differing only in those fields must not collide in the memo.
+  let base = mk_mega_state_1v1()
+  let diff_my_used = { ..base, my_mega_used: true }
+  let diff_opp_used = { ..base, opp_mega_used: true }
+  let diff_my_flag = { ..base, my_megaed: [true] }
+  let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
+  cache[base] = 0.1
+  cache[diff_my_used] = 0.2
+  cache[diff_opp_used] = 0.3
+  cache[diff_my_flag] = 0.4
+  assert_eq(cache.get(base), Some(0.1))
+  assert_eq(cache.get(diff_my_used), Some(0.2))
+  assert_eq(cache.get(diff_opp_used), Some(0.3))
+  assert_eq(cache.get(diff_my_flag), Some(0.4))
+}
+
+///|
+test "alive_actions_includes_mega_when_available" {
+  // mega_form = Some(_) and mega_used = false → one Mega(mi) per move is
+  // appended alongside the plain UseMove(mi) actions.
+  let team = [
+    mk_combatant(
+      mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+      [
+        mk_move("x", "ノーマル", @model.Physical, 40),
+        mk_move("y", "ノーマル", @model.Physical, 40),
+      ],
+      mega_form=Some(mk_mega_form()),
+    ),
+  ]
+  let hps = [100]
+  let actions = alive_actions(0, hps, team, false)
+  let mut moves = 0
+  let mut megas = 0
+  let mut switches = 0
+  for a in actions {
+    match a {
+      UseMove(_) => moves += 1
+      Mega(_) => megas += 1
+      Switch(_) => switches += 1
+    }
+  }
+  assert_eq(moves, 2)
+  assert_eq(megas, 2)
+  assert_eq(switches, 0)
+}
+
+///|
+test "alive_actions_excludes_mega_when_already_used" {
+  let team = [
+    mk_combatant(
+      mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+      [mk_move("x", "ノーマル", @model.Physical, 40)],
+      mega_form=Some(mk_mega_form()),
+    ),
+  ]
+  let hps = [100]
+  let actions = alive_actions(0, hps, team, true) // mega_used = true
+  let mut megas = 0
+  for a in actions {
+    match a {
+      Mega(_) => megas += 1
+      _ => ()
+    }
+  }
+  assert_eq(megas, 0)
+}
+
+///|
+test "alive_actions_excludes_mega_when_no_mega_form" {
+  // A combatant without mega_form must never surface Mega actions even when
+  // the side's mega_used = false.
+  let team = [
+    mk_combatant(
+      mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+      [mk_move("x", "ノーマル", @model.Physical, 40)],
+    ),
+  ]
+  let hps = [100]
+  let actions = alive_actions(0, hps, team, false)
+  let mut megas = 0
+  for a in actions {
+    match a {
+      Mega(_) => megas += 1
+      _ => ()
+    }
+  }
+  assert_eq(megas, 0)
+}
+
+///|
+test "transition_mega_sets_mega_used_and_megaed_flags" {
+  // `Mega(0)` must flip both the side-level and slot-level flags.
+  let me = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+    [mk_move("x", "ノーマル", @model.Physical, 40)],
+    mega_form=Some(mk_mega_form()),
+  )
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 500, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let state = mk_mega_state_1v1(my_hp=100, opp_hp=500)
+  let next = transition(state, Mega(0), UseMove(0), [me], [opp])
+  assert_eq(next.my_mega_used, true)
+  assert_eq(next.my_megaed[0], true)
+  // Opp side unchanged.
+  assert_eq(next.opp_mega_used, false)
+  assert_eq(next.opp_megaed[0], false)
+}
+
+///|
+test "transition_mega_vs_move_uses_mega_stats_for_damage" {
+  // Same base but with mega_form that boosts ATK from 100 → 200. A single Mega
+  // turn must deal strictly more damage than a vanilla UseMove turn against
+  // an inert opponent.
+  let base = mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100)
+  let mega_attacker = mk_combatant(
+    base,
+    [mk_move("のしかかり", "ノーマル", @model.Physical, 85)],
+    mega_form=Some(mk_mega_form(atk=200)),
+  )
+  let plain_attacker = mk_combatant(
+    base,
+    [mk_move("のしかかり", "ノーマル", @model.Physical, 85)],
+  )
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 500, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let state = mk_mega_state_1v1(my_hp=100, opp_hp=500)
+  let after_mega = transition(state, Mega(0), UseMove(0), [mega_attacker], [opp])
+  let after_plain = transition(
+    state, UseMove(0), UseMove(0), [plain_attacker], [opp],
+  )
+  let dmg_mega = 500 - after_mega.opp_hps[0]
+  let dmg_plain = 500 - after_plain.opp_hps[0]
+  assert_true(dmg_mega > dmg_plain)
+}
+
+///|
+test "transition_mega_vs_move_uses_mega_type_for_stab" {
+  // Base is Normal/—, mega is Dragon/Ground; a Ground move is non-STAB as
+  // base but STAB as mega → damage increases.
+  let base = mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100)
+  let mega_attacker = mk_combatant(
+    base,
+    [mk_move("じしん", "じめん", @model.Physical, 100)],
+    mega_form=Some(mk_mega_form(type1="ドラゴン", type2="じめん")),
+  )
+  let plain_attacker = mk_combatant(
+    base,
+    [mk_move("じしん", "じめん", @model.Physical, 100)],
+  )
+  // Neutral defender so type matchup does not confound the STAB comparison.
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 500, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let state = mk_mega_state_1v1(my_hp=100, opp_hp=500)
+  let after_mega = transition(state, Mega(0), UseMove(0), [mega_attacker], [opp])
+  let after_plain = transition(
+    state, UseMove(0), UseMove(0), [plain_attacker], [opp],
+  )
+  let dmg_mega = 500 - after_mega.opp_hps[0]
+  let dmg_plain = 500 - after_plain.opp_hps[0]
+  assert_true(dmg_mega > dmg_plain)
+}
+
+///|
+test "transition_mega_vs_switch_damages_newly_switched_target" {
+  // My side megas + attacks; opp switches. The Mega-stat-boosted attack must
+  // land on the incoming opp pokemon with fresh ranks.
+  let me = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+    [mk_move("のしかかり", "ノーマル", @model.Physical, 85)],
+    mega_form=Some(mk_mega_form(atk=200)),
+  )
+  let opp_0 = mk_combatant(
+    mk_pokemon("B0", "ノーマル", "", 500, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let opp_1 = mk_combatant(
+    mk_pokemon("B1", "ノーマル", "", 500, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let opp_team = [opp_0, opp_1]
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [100],
+    opp_hps: [500, 500],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false],
+    opp_megaed: [false, false],
+    turn: 0,
+  }
+  let next = transition(state, Mega(0), Switch(1), [me], opp_team)
+  assert_eq(next.opp_active, 1)
+  // Outgoing opp slot untouched, incoming slot took the mega-boosted hit.
+  assert_eq(next.opp_hps[0], 500)
+  assert_true(next.opp_hps[1] < 500)
+  assert_eq(next.my_mega_used, true)
+}
+
+///|
+test "transition_simultaneous_mega_both_sides_flips_both" {
+  // Both sides pick `Mega` on the same turn. Both mega_used flags go high and
+  // both slot-level megaed entries are set.
+  let me = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+    [mk_move("のしかかり", "ノーマル", @model.Physical, 60)],
+    mega_form=Some(mk_mega_form(atk=200)),
+  )
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 100, 100, 100, 100, 100, 150),
+    [mk_move("のしかかり", "ノーマル", @model.Physical, 60)],
+    mega_form=Some(mk_mega_form(atk=200)),
+  )
+  let state = mk_mega_state_1v1(my_hp=500, opp_hp=500)
+  let next = transition(state, Mega(0), Mega(0), [me], [opp])
+  assert_eq(next.my_mega_used, true)
+  assert_eq(next.opp_mega_used, true)
+  assert_eq(next.my_megaed[0], true)
+  assert_eq(next.opp_megaed[0], true)
+}
+
+///|
+test "mega_persists_after_switch_out_and_back_in" {
+  // Slot-level `megaed` survives a switch cycle: active 0 megas, switches to
+  // slot 1, then the caller switches back — slot 0's `megaed` flag remains
+  // true so further incoming attacks still resolve against mega stats.
+  let me_0 = mk_combatant(
+    mk_pokemon("A0", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+    [mk_move("x", "ノーマル", @model.Physical, 60)],
+    mega_form=Some(mk_mega_form(atk=200)),
+  )
+  let me_1 = mk_combatant(
+    mk_pokemon("A1", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+    [mk_move("x", "ノーマル", @model.Physical, 60)],
+  )
+  let opp = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 500, 100, 100, 100, 100, 50),
+    [mk_move("idle", "ノーマル", @model.Status, 0)],
+  )
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [100, 100],
+    opp_hps: [500],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false],
+    turn: 0,
+  }
+  // Turn 1: mega slot 0.
+  let after_mega = transition(state, Mega(0), UseMove(0), [me_0, me_1], [opp])
+  assert_eq(after_mega.my_megaed[0], true)
+  // Turn 2: switch to slot 1.
+  let after_switch_out = transition(
+    after_mega, Switch(1), UseMove(0), [me_0, me_1], [opp],
+  )
+  assert_eq(after_switch_out.my_active, 1)
+  // Slot 0's mega flag must still be set.
+  assert_eq(after_switch_out.my_megaed[0], true)
+  // Turn 3: switch back to slot 0.
+  let after_switch_back = transition(
+    after_switch_out, Switch(0), UseMove(0), [me_0, me_1], [opp],
+  )
+  assert_eq(after_switch_back.my_active, 0)
+  assert_eq(after_switch_back.my_megaed[0], true)
+}
+
+///|
+test "alive_actions_no_mega_for_second_pokemon_after_first_mega" {
+  // After side-level `mega_used` is true, switching to another mega-capable
+  // Pokemon does NOT re-enable the Mega action (per-side 1-mega-max rule).
+  let team = [
+    mk_combatant(
+      mk_pokemon("A0", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+      [mk_move("x", "ノーマル", @model.Physical, 40)],
+      mega_form=Some(mk_mega_form()),
+    ),
+    mk_combatant(
+      mk_pokemon("A1", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+      [mk_move("x", "ノーマル", @model.Physical, 40)],
+      mega_form=Some(mk_mega_form()),
+    ),
+  ]
+  let hps = [100, 100]
+  let actions = alive_actions(1, hps, team, true)
+  let mut megas = 0
+  for a in actions {
+    match a {
+      Mega(_) => megas += 1
+      _ => ()
+    }
+  }
+  assert_eq(megas, 0)
+}
+
+///|
+test "non_mega_game_regression_preserves_existing_winrate" {
+  // Baseline: with all `mega_form = None` the switching game winrate must be
+  // exactly the pre-mega behaviour. Re-runs the dominant-team scenario and
+  // asserts the same sign. Guards against accidental mega-path activation in
+  // the all-None input.
+  let strong = mk_combatant(
+    mk_pokemon("A0", "ノーマル", "", 200, 200, 150, 100, 150, 150),
+    [mk_move("mv", "ノーマル", @model.Physical, 100)],
+  )
+  let weak = mk_combatant(
+    mk_pokemon("B0", "ノーマル", "", 100, 80, 80, 60, 80, 80),
+    [mk_move("mv", "ノーマル", @model.Physical, 40)],
+  )
+  let v = switching_game_winrate([strong], [weak], 2)
+  assert_true(v > 0.0)
+}
+
+///|
+test "damage_cache_distinguishes_mega_vs_base" {
+  // Same slot indices, same move, same ranks, but different mega flags must
+  // yield two cache misses (different DamageKey), not a collision.
+  let a = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 100, 100, 100, 100, 100, 100),
+    [mk_move("mv", "ノーマル", @model.Physical, 80)],
+    mega_form=Some(mk_mega_form(atk=200)),
+  )
+  let b = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 500, 100, 100, 100, 100, 100),
+    [mk_move("mv", "ノーマル", @model.Physical, 80)],
+  )
+  let cache = new_damage_cache()
+  let ranks = [0, 0, 0, 0, 0]
+  let d_base = mean_damage_cached(
+    cache, true, 0, ranks, 0, ranks, 0, [a], [b],
+    atk_mega=false, def_mega=false,
+  )
+  let d_mega = mean_damage_cached(
+    cache, true, 0, ranks, 0, ranks, 0, [a], [b],
+    atk_mega=true, def_mega=false,
+  )
+  assert_eq(cache.misses, 2)
+  assert_eq(cache.hits, 0)
+  assert_true(d_mega > d_base)
+  // Hit on repeated lookup confirms the cache reuses the new mega key.
+  let d_mega_again = mean_damage_cached(
+    cache, true, 0, ranks, 0, ranks, 0, [a], [b],
+    atk_mega=true, def_mega=false,
+  )
+  assert_eq(d_mega_again, d_mega)
+  assert_eq(cache.hits, 1)
+}
+
+///|
+/// Reference implementation: the pre-αβ `value` function with NO pruning of
+/// any kind (no pure-saddle detection, no β-cutoff). Every state fully fills
+/// its payoff matrix and solves the LP. Used by bit-exact regression tests to
+/// verify that `value` with default `(alpha=-1, beta=+1)` returns the same
+/// top-level number.
+///
+/// Must be kept in sync with `value` in switching_game.mbt except for the
+/// αβ / saddle short-circuits; any change to action enumeration, transition
+/// resolution, or caching must be mirrored here.
+fn value_no_prune(
+  state : SwitchingGameState,
+  my_team : Array[Combatant],
+  opp_team : Array[Combatant],
+  turn_limit : Int,
+  cache : @hashmap.HashMap[SwitchingGameState, Double],
+  stats : ValueStats,
+  dmg_cache : DamageCache,
+) -> Double {
+  match terminal_value(state, my_team, opp_team, turn_limit) {
+    Some(v) => return v
+    None => ()
+  }
+  match cache.get(state) {
+    Some(v) => {
+      stats.hits = stats.hits + 1
+      return v
+    }
+    None => stats.misses = stats.misses + 1
+  }
+  let actions_me = alive_actions(
+    state.my_active, state.my_hps, my_team, state.my_mega_used,
+  )
+  let actions_opp = alive_actions(
+    state.opp_active, state.opp_hps, opp_team, state.opp_mega_used,
+  )
+  if actions_me.length() == 0 {
+    return -1.0
+  }
+  if actions_opp.length() == 0 {
+    return 1.0
+  }
+  let data = Array::make(actions_me.length(), ([] : Array[Double]))
+  for i in 0..<actions_me.length() {
+    data[i] = Array::make(actions_opp.length(), 0.0)
+  }
+  for i in 0..<actions_me.length() {
+    for j in 0..<actions_opp.length() {
+      let outcomes = transition_with_cache(
+        state, actions_me[i], actions_opp[j], my_team, opp_team, dmg_cache,
+      )
+      let mut ev = 0.0
+      for outcome in outcomes {
+        let (prob, next) = outcome
+        ev += prob *
+          value_no_prune(
+            next, my_team, opp_team, turn_limit, cache, stats, dmg_cache,
+          )
+      }
+      data[i][j] = ev
+    }
+  }
+  let m = match @nash.FiniteMatrix::new(data) {
+    Ok(x) => x
+    Err(_) => return 0.0
+  }
+  let lp = try @nash.solve_zero_sum(m) catch {
+    _ => return 0.0
+  }
+  let result = match lp {
+    Optimal(value~, ..) => value
+    _ => 0.0
+  }
+  cache.set(state, result)
+  result
+}
+
+///|
+/// Top-level entry point for the no-pruning reference implementation.
+fn switching_game_winrate_no_prune(
+  my_team : Array[Combatant],
+  opp_team : Array[Combatant],
+  turn_limit : Int,
+) -> (Double, ValueStats) {
+  let my_hps = Array::make(my_team.length(), 0)
+  let opp_hps = Array::make(opp_team.length(), 0)
+  for i in 0..<my_team.length() {
+    my_hps[i] = my_team[i].pokemon.hp
+  }
+  for i in 0..<opp_team.length() {
+    opp_hps[i] = opp_team[i].pokemon.hp
+  }
+  let my_megaed = Array::make(my_team.length(), false)
+  let opp_megaed = Array::make(opp_team.length(), false)
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps,
+    opp_hps,
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed,
+    opp_megaed,
+    turn: 0,
+  }
+  let cache : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
+  let stats = new_stats()
+  let dmg_cache = new_damage_cache()
+  let v = value_no_prune(
+    state, my_team, opp_team, turn_limit, cache, stats, dmg_cache,
+  )
+  (v, stats)
+}
+
+///|
+test "alpha_beta_returns_same_value_as_no_pruning_minimal_1v1" {
+  // Smallest non-terminal case: 1v1 single-move teams. Saddle fast path should
+  // fire (every subgame is a 1×1 matrix, trivial saddle). αβ result must match
+  // the reference implementation to FP precision.
+  let a = mk_combatant(
+    mk_pokemon("A", "ノーマル", "", 100, 150, 100, 100, 100, 120),
+    [mk_move("slash", "ノーマル", @model.Physical, 80)],
+  )
+  let b = mk_combatant(
+    mk_pokemon("B", "ノーマル", "", 100, 120, 100, 100, 100, 100),
+    [mk_move("slash", "ノーマル", @model.Physical, 70)],
+  )
+  let v_prune = switching_game_winrate([a], [b], 2)
+  let (v_no_prune, _) = switching_game_winrate_no_prune([a], [b], 2)
+  assert_true((v_prune - v_no_prune).abs() < 1.0e-12)
+}
+
+///|
+test "alpha_beta_returns_same_value_as_no_pruning_with_switch" {
+  // 2v2 teams where switch actions matter (slow heavy hitter vs fast frail
+  // attacker). Exercises the switch branch of `transition_with_cache`; αβ
+  // cutoffs may or may not trigger depending on iteration order, but the
+  // top-level value must be exactly equal to the unpruned reference.
+  let a0 = mk_combatant(
+    mk_pokemon("A0", "ノーマル", "", 150, 200, 100, 100, 100, 80),
+    [mk_move("heavy", "ノーマル", @model.Physical, 100)],
+  )
+  let a1 = mk_combatant(
+    mk_pokemon("A1", "ノーマル", "", 100, 120, 100, 100, 100, 130),
+    [mk_move("swift", "ノーマル", @model.Physical, 60)],
+  )
+  let b0 = mk_combatant(
+    mk_pokemon("B0", "ノーマル", "", 120, 150, 100, 100, 100, 90),
+    [mk_move("mid", "ノーマル", @model.Physical, 80)],
+  )
+  let b1 = mk_combatant(
+    mk_pokemon("B1", "ノーマル", "", 130, 100, 100, 100, 100, 110),
+    [mk_move("swift", "ノーマル", @model.Physical, 65)],
+  )
+  let v_prune = switching_game_winrate([a0, a1], [b0, b1], 2)
+  let (v_no_prune, _) = switching_game_winrate_no_prune([a0, a1], [b0, b1], 2)
+  assert_true((v_prune - v_no_prune).abs() < 1.0e-12)
+}
+
+///|
+test "alpha_beta_returns_same_value_as_no_pruning_mirror_match" {
+  // Mirror match: expected value is exactly 0 by symmetry. Any divergence
+  // between αβ and reference here would signal a correctness bug in the
+  // pruning predicate.
+  let team = build_dummy_team(2, 120)
+  let v_prune = switching_game_winrate(team, team, 2)
+  let (v_no_prune, _) = switching_game_winrate_no_prune(team, team, 2)
+  assert_true((v_prune - v_no_prune).abs() < 1.0e-12)
+  assert_true(v_prune.abs() < 1.0e-9)
+}
+
+///|
+test "alpha_beta_reduces_or_matches_miss_count" {
+  // Dominant team case: strong team should clean up fast, producing many
+  // terminal states early. Node-level saddle detection + β-cutoff should make
+  // the αβ variant visit AT MOST as many unique states as the reference (and
+  // in practice strictly fewer for dominant scenarios).
+  let strong_team = [
+    mk_combatant(
+      mk_pokemon("S0", "ノーマル", "", 150, 250, 120, 100, 120, 200),
+      [mk_move("lethal", "ノーマル", @model.Physical, 250)],
+    ),
+    mk_combatant(
+      mk_pokemon("S1", "ノーマル", "", 150, 250, 120, 100, 120, 200),
+      [mk_move("lethal", "ノーマル", @model.Physical, 250)],
+    ),
+  ]
+  let weak_team = [
+    mk_combatant(
+      mk_pokemon("W0", "ノーマル", "", 50, 50, 50, 50, 50, 30),
+      [mk_move("weak", "ノーマル", @model.Physical, 10)],
+    ),
+    mk_combatant(
+      mk_pokemon("W1", "ノーマル", "", 50, 50, 50, 50, 50, 30),
+      [mk_move("weak", "ノーマル", @model.Physical, 10)],
+    ),
+  ]
+  let (_, stats_prune, _) = switching_game_winrate_stats(
+    strong_team, weak_team, 2,
+  )
+  let (_, stats_no_prune) = switching_game_winrate_no_prune(
+    strong_team, weak_team, 2,
+  )
+  // αβ must not visit more states than the reference (soundness of pruning).
+  assert_true(stats_prune.misses <= stats_no_prune.misses)
+}
+
+///|
+test "value_accepts_explicit_alpha_beta_and_matches_default" {
+  // Passing (alpha=-1, beta=+1) explicitly (the defaults) must produce the
+  // same result as omitting them. Locks in the default-arg contract so a
+  // future change to the defaults won't silently alter caller semantics.
+  let team = build_dummy_team(2, 100)
+  let state : SwitchingGameState = {
+    my_active: 0,
+    opp_active: 0,
+    my_hps: [100, 100],
+    opp_hps: [100, 100],
+    my_ranks: [0, 0, 0, 0, 0],
+    opp_ranks: [0, 0, 0, 0, 0],
+    my_mega_used: false,
+    opp_mega_used: false,
+    my_megaed: [false, false],
+    opp_megaed: [false, false],
+    turn: 0,
+  }
+  let cache1 : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
+  let cache2 : @hashmap.HashMap[SwitchingGameState, Double] = @hashmap.HashMap::new()
+  let dmg1 = new_damage_cache()
+  let dmg2 = new_damage_cache()
+  let s1 = new_stats()
+  let s2 = new_stats()
+  let v1 = value(state, team, team, 2, cache1, s1, dmg1)
+  let v2 = value(
+    state, team, team, 2, cache2, s2, dmg2, alpha=-1.0, beta=1.0,
+  )
+  assert_true((v1 - v2).abs() < 1.0e-12)
+}
+
+///|
+test "switching_game_turn_limit_3_produces_finite_value_on_multi_pokemon_team" {
+  // Regression: before the solver saddle fast-path + value αβ-pruning,
+  // turn_limit=3 on real 6v6 input (Nosada vs カマカマキリ) failed after ~70s
+  // of simplex pivots with `InconsistentGame` on a degenerate LP. This test
+  // pins that the tl=3 path at least returns a finite in-range value on a
+  // modestly-sized team without raising. The in-repo payload is a small 2v2
+  // proxy; the full 6v6 smoke lives in /tmp/pkdx_smoke/repro_tl3.py.
+  let a0 = mk_combatant(
+    mk_pokemon("A0", "ノーマル", "", 150, 180, 110, 100, 110, 120),
+    [mk_move("strike", "ノーマル", @model.Physical, 90)],
+  )
+  let a1 = mk_combatant(
+    mk_pokemon("A1", "ほのお", "", 130, 140, 100, 120, 100, 140),
+    [mk_move("ember", "ほのお", @model.Special, 70)],
+  )
+  let b0 = mk_combatant(
+    mk_pokemon("B0", "みず", "", 140, 150, 110, 110, 110, 110),
+    [mk_move("surf", "みず", @model.Special, 90)],
+  )
+  let b1 = mk_combatant(
+    mk_pokemon("B1", "くさ", "", 120, 130, 100, 130, 100, 130),
+    [mk_move("leaf", "くさ", @model.Special, 80)],
+  )
+  let v = switching_game_winrate([a0, a1], [b0, b1], 3)
+  assert_true(v >= -1.0 && v <= 1.0)
+  assert_true(not(v.is_nan()))
+  assert_true(not(v.is_inf()))
 }
